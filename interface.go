@@ -1,5 +1,7 @@
 package ssz
 
+import "io"
+
 // Marshaler is the interface implemented by types that can marshal themselves into valid SZZ.
 type Marshaler interface {
 	MarshalSSZTo(dst []byte) ([]byte, error)
@@ -15,6 +17,16 @@ type SSZSizer interface {
 type Unmarshaler interface {
 	UnmarshalSSZ(buf []byte) error
 	UnmarshalSSZTail(buf []byte) ([]byte, error)
+}
+
+type Decoder interface {
+	Unmarshaler
+	Decode(src io.Reader, limit int) (int, error)
+}
+
+type Encoder interface {
+	Marshaler
+	Encode(dst io.Writer) (int, error)
 }
 
 type HashRoot interface {
@@ -52,7 +64,7 @@ type HashWalker interface {
 
 type PtrConstraint[T any] interface {
 	*T
-	Unmarshaler
+	Decoder
 	SSZSizer
 }
 
@@ -147,4 +159,12 @@ func UnmarshalSSZ(v Unmarshaler, buf []byte) error {
 		return ErrTailNotEmpty
 	}
 	return err
+}
+
+func Decode(v Decoder, src io.Reader, limit int) (int, error) {
+	return v.Decode(src, limit)
+}
+
+func Encode(v Encoder, dst io.Writer) (int, error) {
+	return v.Encode(dst)
 }

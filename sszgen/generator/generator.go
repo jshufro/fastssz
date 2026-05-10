@@ -334,6 +334,8 @@ func (e *env) print(order []string) (string, bool, error) {
 	package {{.package}}
 
 	import (
+		"io"
+
 		ssz "github.com/ferranbt/fastssz" {{ if .imports }}{{ range $value := .imports }}
 			{{ $value }} {{ end }}
 		{{ end }}
@@ -342,6 +344,8 @@ func (e *env) print(order []string) (string, bool, error) {
 	{{ range .objs }}
 		{{ .Marshal }}
 		{{ .Unmarshal }}
+		{{ .Encode }}
+		{{ .Decode }}
 		{{ .Size }}
 		{{ .HashTreeRoot }}
 		{{ .GetTree }}
@@ -355,7 +359,7 @@ func (e *env) print(order []string) (string, bool, error) {
 	}
 
 	type Obj struct {
-		Size, Marshal, Unmarshal, HashTreeRoot, GetTree string
+		Size, Marshal, Unmarshal, HashTreeRoot, GetTree, Encode, Decode string
 	}
 
 	objs := []*Obj{}
@@ -397,6 +401,8 @@ func (e *env) print(order []string) (string, bool, error) {
 			GetTree:      e.getTree(funcSigName, obj),
 			Marshal:      e.marshal(funcSigName, obj),
 			Unmarshal:    e.unmarshal(funcSigName, obj),
+			Encode:       e.encode(funcSigName, obj),
+			Decode:       e.decode(funcSigName, obj),
 			Size:         e.size(funcSigName, obj),
 		})
 	}
