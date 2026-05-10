@@ -8,15 +8,15 @@ func (e *env) decode(name string, v *Value) string {
 
 	str := execTmpl(tmpl, map[string]interface{}{
 		"name":   name,
-		"decode": v.decodeContainer(true, "src", "limit"),
+		"decode": v.decodeContainer(),
 	})
 
 	return appendObjSignature(str, v)
 }
 
-func (v *Value) decodeContainer(start bool, src string, limit string) (str string) {
+func (v *Value) decodeContainer() (str string) {
 	tmpl := `fixedSize := ::.fixedSize()
-	if {{.limit}} < fixedSize {
+	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
 	buf, err := io.ReadAll(src)
@@ -31,10 +31,8 @@ func (v *Value) decodeContainer(start bool, src string, limit string) (str strin
 	`
 
 	str += execTmpl(tmpl, map[string]interface{}{
-		"name":  v.name,
-		"obj":   v,
-		"src":   src,
-		"limit": limit,
+		"name": v.name,
+		"obj":  v,
 	})
 
 	return
