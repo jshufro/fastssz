@@ -17,6 +17,8 @@ import (
 )
 
 type codec interface {
+	ssz.Encoder
+	ssz.Decoder
 	ssz.Marshaler
 	ssz.Unmarshaler
 	ssz.HashRoot
@@ -212,6 +214,19 @@ func checkSSZEncoding(t *testing.T, rootObj ssz.Unmarshaler, fork fork, fileName
 		fatal("marshalSSZ_equal", fmt.Errorf("bad marshal"))
 	}
 
+	// Encode
+	encodedBuf := bytes.NewBuffer(make([]byte, 0, obj.SizeSSZ()))
+	encodedLen, err := obj.Encode(encodedBuf)
+	if err != nil {
+		fatal("Encode", err)
+	}
+	if encodedLen != obj.SizeSSZ() {
+		fatal("Encode_size", fmt.Errorf("bad encode size"))
+	}
+	if !bytes.Equal(encodedBuf.Bytes(), output.ssz) {
+		fatal("Encode_equal", fmt.Errorf("bad encode"))
+	}
+
 	// Unmarshal
 	obj2 := base(fork)
 	if err := obj2.UnmarshalSSZ(output.ssz); err != nil {
@@ -219,6 +234,20 @@ func checkSSZEncoding(t *testing.T, rootObj ssz.Unmarshaler, fork fork, fileName
 	}
 	if !deepEqual(obj, obj2) {
 		fatal("UnmarshalSSZ_equal", fmt.Errorf("bad unmarshal"))
+	}
+
+	// Decode
+	obj3 := base(fork)
+	srcBuf := bytes.NewReader(output.ssz)
+	decodedLen, err := obj3.Decode(srcBuf, len(output.ssz))
+	if err != nil {
+		fatal("Decode", err)
+	}
+	if decodedLen != obj.SizeSSZ() || decodedLen != len(output.ssz) {
+		fatal("Decode_size", fmt.Errorf("bad decode size"))
+	}
+	if !deepEqual(obj, obj3) {
+		fatal("Decode_equal", fmt.Errorf("bad decode"))
 	}
 
 	// Try to decode on top of rootObj to ensure the fast unmarshalling works
@@ -262,7 +291,7 @@ func checkSSZEncoding(t *testing.T, rootObj ssz.Unmarshaler, fork fork, fileName
 	}
 }
 
-const benchmarkTestCase = "../eth2.0-spec-tests/tests/mainnet/phase0/ssz_static/BeaconBlock/ssz_random/case_4"
+const benchmarkTestCase = "../consensus-spec-tests/tests/mainnet/phase0/ssz_static/BeaconBlock/ssz_random/case_4"
 
 func BenchmarkMarshal_Fast(b *testing.B) {
 	obj := new(BeaconBlock)
@@ -275,7 +304,6 @@ func BenchmarkMarshal_Fast(b *testing.B) {
 		obj.MarshalSSZ()
 	}
 }
-
 func BenchmarkMarshal_SuperFast(b *testing.B) {
 	obj := new(BeaconBlock)
 	readValidGenericSSZ(nil, benchmarkTestCase, obj)
@@ -287,6 +315,34 @@ func BenchmarkMarshal_SuperFast(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		buf, _ = obj.MarshalSSZTo(buf[:0])
+	}
+}
+
+func BenchmarkEncode_Fast(b *testing.B) {
+	obj := new(BeaconBlock)
+	readValidGenericSSZ(nil, benchmarkTestCase, obj)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		buf := bytes.NewBuffer(make([]byte, 0, obj.SizeSSZ()))
+		obj.Encode(buf)
+	}
+}
+
+func BenchmarkEncode_SuperFast(b *testing.B) {
+	obj := new(BeaconBlock)
+	readValidGenericSSZ(nil, benchmarkTestCase, obj)
+
+	buf := bytes.NewBuffer(make([]byte, 0, obj.SizeSSZ()))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		obj.Encode(buf)
+		buf.Reset()
 	}
 }
 
@@ -305,6 +361,27 @@ func BenchmarkUnMarshal_Fast(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		obj2 := new(BeaconBlock)
 		if err := obj2.UnmarshalSSZ(dst); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDecode_Fast(b *testing.B) {
+	obj := new(BeaconBlock)
+	readValidGenericSSZ(nil, benchmarkTestCase, obj)
+
+	src, err := obj.MarshalSSZ()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		srcBuf := bytes.NewReader(src)
+		_, err := obj.Decode(srcBuf, obj.SizeSSZ())
+		if err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -351,7 +428,7 @@ func BenchmarkProof_Tree(b *testing.B) {
 }
 
 const (
-	testsPath      = "../eth2.0-spec-tests/tests"
+	testsPath      = "../consensus-spec-tests/tests"
 	serializedFile = "serialized.ssz_snappy"
 	valueFile      = "value.yaml"
 	rootsFile      = "roots.yaml"
