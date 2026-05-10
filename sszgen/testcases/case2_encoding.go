@@ -44,7 +44,7 @@ func (c *Case2A) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Case2A object
-func (c *Case2A) Encode(dst io.Writer, limit int) (int, error) {
+func (c *Case2A) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(c)
 	if err != nil {
 		return 0, err
@@ -144,7 +144,7 @@ func (c *Case2B) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Case2B object
-func (c *Case2B) Encode(dst io.Writer, limit int) (int, error) {
+func (c *Case2B) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(c)
 	if err != nil {
 		return 0, err

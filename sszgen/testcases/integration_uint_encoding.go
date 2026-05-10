@@ -170,7 +170,7 @@ func (i *IntegrationUint) UnmarshalSSZTail(buf []byte) (rest []byte, err error) 
 }
 
 // EncodeSSZ encodes the IntegrationUint object
-func (i *IntegrationUint) Encode(dst io.Writer, limit int) (int, error) {
+func (i *IntegrationUint) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(i)
 	if err != nil {
 		return 0, err

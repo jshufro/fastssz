@@ -68,7 +68,7 @@ func (p *PR1512) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the PR1512 object
-func (p *PR1512) Encode(dst io.Writer, limit int) (int, error) {
+func (p *PR1512) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(p)
 	if err != nil {
 		return 0, err

@@ -53,7 +53,7 @@ func (v *Vec) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Vec object
-func (v *Vec) Encode(dst io.Writer, limit int) (int, error) {
+func (v *Vec) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(v)
 	if err != nil {
 		return 0, err
@@ -181,7 +181,7 @@ func (v *Vec2) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Vec2 object
-func (v *Vec2) Encode(dst io.Writer, limit int) (int, error) {
+func (v *Vec2) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(v)
 	if err != nil {
 		return 0, err

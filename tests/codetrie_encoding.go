@@ -60,7 +60,7 @@ func (m *Metadata) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Metadata object
-func (m *Metadata) Encode(dst io.Writer, limit int) (int, error) {
+func (m *Metadata) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(m)
 	if err != nil {
 		return 0, err
@@ -174,7 +174,7 @@ func (c *Chunk) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Chunk object
-func (c *Chunk) Encode(dst io.Writer, limit int) (int, error) {
+func (c *Chunk) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(c)
 	if err != nil {
 		return 0, err
@@ -311,7 +311,7 @@ func (c *CodeTrieSmall) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the CodeTrieSmall object
-func (c *CodeTrieSmall) Encode(dst io.Writer, limit int) (int, error) {
+func (c *CodeTrieSmall) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(c)
 	if err != nil {
 		return 0, err
@@ -466,7 +466,7 @@ func (c *CodeTrieBig) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the CodeTrieBig object
-func (c *CodeTrieBig) Encode(dst io.Writer, limit int) (int, error) {
+func (c *CodeTrieBig) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(c)
 	if err != nil {
 		return 0, err

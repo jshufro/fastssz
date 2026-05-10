@@ -44,7 +44,7 @@ func (c *Case6) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Case6 object
-func (c *Case6) Encode(dst io.Writer, limit int) (int, error) {
+func (c *Case6) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(c)
 	if err != nil {
 		return 0, err

@@ -48,7 +48,7 @@ func (i *Issue158) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Issue158 object
-func (i *Issue158) Encode(dst io.Writer, limit int) (int, error) {
+func (i *Issue158) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(i)
 	if err != nil {
 		return 0, err

@@ -50,7 +50,7 @@ func (t *TimeType) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the TimeType object
-func (t *TimeType) Encode(dst io.Writer, limit int) (int, error) {
+func (t *TimeType) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(t)
 	if err != nil {
 		return 0, err
@@ -153,7 +153,7 @@ func (t *TimeRawType) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the TimeRawType object
-func (t *TimeRawType) Encode(dst io.Writer, limit int) (int, error) {
+func (t *TimeRawType) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(t)
 	if err != nil {
 		return 0, err

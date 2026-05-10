@@ -78,7 +78,7 @@ func (u *Uints) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Uints object
-func (u *Uints) Encode(dst io.Writer, limit int) (int, error) {
+func (u *Uints) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(u)
 	if err != nil {
 		return 0, err

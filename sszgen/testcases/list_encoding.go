@@ -48,7 +48,7 @@ func (b *BytesWrapper) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the BytesWrapper object
-func (b *BytesWrapper) Encode(dst io.Writer, limit int) (int, error) {
+func (b *BytesWrapper) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(b)
 	if err != nil {
 		return 0, err
@@ -174,7 +174,7 @@ func (l *ListC) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the ListC object
-func (l *ListC) Encode(dst io.Writer, limit int) (int, error) {
+func (l *ListC) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(l)
 	if err != nil {
 		return 0, err
@@ -308,7 +308,7 @@ func (l *ListP) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the ListP object
-func (l *ListP) Encode(dst io.Writer, limit int) (int, error) {
+func (l *ListP) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(l)
 	if err != nil {
 		return 0, err

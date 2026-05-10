@@ -81,7 +81,7 @@ func (o *Obj2) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 }
 
 // EncodeSSZ encodes the Obj2 object
-func (o *Obj2) Encode(dst io.Writer, limit int) (int, error) {
+func (o *Obj2) Encode(dst io.Writer) (int, error) {
 	buf, err := ssz.MarshalSSZ(o)
 	if err != nil {
 		return 0, err
