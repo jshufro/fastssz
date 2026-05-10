@@ -4,6 +4,8 @@
 package tests
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -55,6 +57,34 @@ func (m *Metadata) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	m.CodeLength, buf = ssz.UnmarshallValue[uint16](buf)
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the Metadata object
+func (m *Metadata) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(m)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Metadata from an io.Reader
+func (m *Metadata) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := m.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = m.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the Metadata object
@@ -141,6 +171,34 @@ func (c *Chunk) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	c.Code, buf = ssz.UnmarshalBytes(c.Code, buf, 32)
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the Chunk object
+func (c *Chunk) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(c)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Chunk from an io.Reader
+func (c *Chunk) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := c.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = c.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the Chunk object
@@ -250,6 +308,34 @@ func (c *CodeTrieSmall) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return
+}
+
+// EncodeSSZ encodes the CodeTrieSmall object
+func (c *CodeTrieSmall) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(c)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the CodeTrieSmall from an io.Reader
+func (c *CodeTrieSmall) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := c.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = c.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the CodeTrieSmall object
@@ -377,6 +463,34 @@ func (c *CodeTrieBig) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return
+}
+
+// EncodeSSZ encodes the CodeTrieBig object
+func (c *CodeTrieBig) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(c)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the CodeTrieBig from an io.Reader
+func (c *CodeTrieBig) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := c.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = c.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the CodeTrieBig object

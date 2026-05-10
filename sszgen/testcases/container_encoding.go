@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -48,6 +50,34 @@ func (v *Vec) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the Vec object
+func (v *Vec) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(v)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Vec from an io.Reader
+func (v *Vec) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := v.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = v.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the Vec object
@@ -148,6 +178,34 @@ func (v *Vec2) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return
+}
+
+// EncodeSSZ encodes the Vec2 object
+func (v *Vec2) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(v)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Vec2 from an io.Reader
+func (v *Vec2) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := v.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = v.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the Vec2 object

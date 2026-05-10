@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -58,6 +60,34 @@ func (c *Case1A) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return
+}
+
+// EncodeSSZ encodes the Case1A object
+func (c *Case1A) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(c)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Case1A from an io.Reader
+func (c *Case1A) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := c.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = c.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the Case1A object
@@ -156,6 +186,34 @@ func (c *Case1B) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return
+}
+
+// EncodeSSZ encodes the Case1B object
+func (c *Case1B) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(c)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Case1B from an io.Reader
+func (c *Case1B) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := c.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = c.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the Case1B object

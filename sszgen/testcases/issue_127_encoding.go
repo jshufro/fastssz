@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -76,6 +78,34 @@ func (o *Obj2) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return
+}
+
+// EncodeSSZ encodes the Obj2 object
+func (o *Obj2) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(o)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Obj2 from an io.Reader
+func (o *Obj2) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := o.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = o.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the Obj2 object

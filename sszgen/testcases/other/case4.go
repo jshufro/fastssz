@@ -1,6 +1,10 @@
 package other
 
-import ssz "github.com/ferranbt/fastssz"
+import (
+	"io"
+
+	ssz "github.com/ferranbt/fastssz"
+)
 
 type Case4Interface struct {
 }
@@ -23,6 +27,14 @@ func (s *Case4Interface) UnmarshalSSZ(buf []byte) error {
 
 func (s *Case4Interface) UnmarshalSSZTail(buf []byte) ([]byte, error) {
 	return nil, nil
+}
+
+func (s *Case4Interface) Decode(src io.Reader, limit int) (int, error) {
+	return 0, nil
+}
+
+func (s *Case4Interface) Encode(dst io.Writer) (int, error) {
+	return 0, nil
 }
 
 type Case4FixedSignature [96]byte

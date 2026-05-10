@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -43,6 +45,34 @@ func (b *BytesWrapper) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	b.Bytes, buf = ssz.UnmarshalBytes(b.Bytes, buf, 48)
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the BytesWrapper object
+func (b *BytesWrapper) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(b)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the BytesWrapper from an io.Reader
+func (b *BytesWrapper) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := b.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = b.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the BytesWrapper object
@@ -141,6 +171,34 @@ func (l *ListC) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return
+}
+
+// EncodeSSZ encodes the ListC object
+func (l *ListC) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(l)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the ListC from an io.Reader
+func (l *ListC) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := l.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = l.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the ListC object
@@ -247,6 +305,34 @@ func (l *ListP) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return
+}
+
+// EncodeSSZ encodes the ListP object
+func (l *ListP) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(l)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the ListP from an io.Reader
+func (l *ListP) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := l.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = l.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the ListP object

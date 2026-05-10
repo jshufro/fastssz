@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -73,6 +75,34 @@ func (u *Uints) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the Uints object
+func (u *Uints) Encode(dst io.Writer, limit int) (int, error) {
+	buf, err := ssz.MarshalSSZ(u)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Uints from an io.Reader
+func (u *Uints) Decode(src io.Reader, limit int) (int, error) {
+	fixedSize := u.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	buf, err := io.ReadAll(src)
+	if err != nil {
+		return 0, err
+	}
+	_, err = u.UnmarshalSSZTail(buf)
+	if err != nil {
+		return 0, err
+	}
+	return len(buf), nil
+
 }
 
 // fixedSize returns the fixed size of the Uints object
