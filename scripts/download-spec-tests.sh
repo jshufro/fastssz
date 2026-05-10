@@ -1,7 +1,7 @@
 #!/bin/bash
 
 VERSION=$1
-REPO_NAME=eth2.0-spec-tests
+REPO_NAME=consensus-spec-tests
 
 # Remove dir if it already exists
 rm -rf $REPO_NAME
