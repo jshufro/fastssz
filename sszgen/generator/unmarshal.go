@@ -244,46 +244,24 @@ func (v *Value) umarshalContainer(start bool, dst string) (str string) {
 		})
 	}
 
-	var offsets []string
-	offsetsMatch := map[string]string{}
-
-	for indx, i := range v.getObjs() {
-		if !i.isFixed() {
-			name := "o" + strconv.Itoa(indx)
-			if len(offsets) != 0 {
-				offsetsMatch[name] = offsets[len(offsets)-1]
-			}
-			offsets = append(offsets, name)
-		}
-	}
-
-	// safe check for the size. Two cases:
-	// 1. Struct is fixed: The size of the input buffer must be the same as the struct.
-	// 2. Struct is dynamic. The size of the input buffer must be higher than the fixed part of the struct.
-
-	var cmp string
-	if v.isFixed() {
-		cmp = "!="
-	} else {
-		cmp = "<"
-	}
-
-	// If the struct is dynamic we create a set of offset variables that will be readed later.
-
-	tmpl := `size := len(buf)
+	str += `size := len(buf)
 	fixedSize := ::.fixedSize()
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-	{{if .offsets}}
-		tail := buf
+	`
+
+	offsets, offsetsMatch := v.getOffsets()
+
+	// If the struct is dynamic we create a set of offset variables that will be readed later.
+
+	tmpl := `{{if .offsets}}tail := buf
 		var {{.offsets}} uint64
 		marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
 	{{end}}
 	`
 
 	str += execTmpl(tmpl, map[string]interface{}{
-		"cmp":     cmp,
 		"offsets": strings.Join(offsets, ", "),
 	})
 

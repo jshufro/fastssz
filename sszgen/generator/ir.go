@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -97,6 +98,20 @@ func (v *Value) getObjs() []*Value {
 		return obj.Elems
 	}
 	return nil
+}
+
+func (v *Value) getOffsets() (offsets []string, offsetsMatch map[string]string) {
+	offsetsMatch = map[string]string{}
+	for indx, i := range v.getObjs() {
+		if !i.isFixed() {
+			name := "o" + strconv.Itoa(indx)
+			if len(offsets) != 0 {
+				offsetsMatch[name] = offsets[len(offsets)-1]
+			}
+			offsets = append(offsets, name)
+		}
+	}
+	return
 }
 
 func (v *Value) isContainer() bool {
