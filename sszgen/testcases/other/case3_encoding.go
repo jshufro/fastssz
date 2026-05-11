@@ -4,6 +4,8 @@
 package other
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -33,6 +35,29 @@ func (c *Case3B) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the Case3B object
+func (c *Case3B) Encode(dst io.Writer) (int, error) {
+	buf, err := ssz.MarshalSSZ(c)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Case3B from an io.Reader
+func (c *Case3B) Decode(src io.Reader, limit int) (n int, err error) {
+	fixedSize := c.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Case3B object

@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -48,6 +50,40 @@ func (v *Vec) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the Vec object
+func (v *Vec) Encode(dst io.Writer) (int, error) {
+	buf, err := ssz.MarshalSSZ(v)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Vec from an io.Reader
+func (v *Vec) Decode(src io.Reader, limit int) (n int, err error) {
+	fixedSize := v.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	var read int
+
+	// Field (0) 'Values'
+	v.Values = ssz.Extend(v.Values, 6)
+	for ii := uint64(0); ii < 6; ii++ {
+		read, err = ssz.DecodeValue[uint64](&v.Values[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Vec object
@@ -129,7 +165,6 @@ func (v *Vec2) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -147,6 +182,54 @@ func (v *Vec2) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 		return nil, err
 	}
 
+	return
+}
+
+// EncodeSSZ encodes the Vec2 object
+func (v *Vec2) Encode(dst io.Writer) (int, error) {
+	buf, err := ssz.MarshalSSZ(v)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Vec2 from an io.Reader
+func (v *Vec2) Decode(src io.Reader, limit int) (n int, err error) {
+	fixedSize := v.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
+
+	// Offset (0) 'Values2'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'Values2'
+	read, err = ssz.DecodeSliceWithIndexCallback(&v.Values2, src, int(uint64(limit)-o0), 4, 100, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint32](&v.Values2[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
 	return
 }
 

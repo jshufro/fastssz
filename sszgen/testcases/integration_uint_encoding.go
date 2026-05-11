@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -95,7 +97,6 @@ func (i *IntegrationUint) UnmarshalSSZTail(buf []byte) (rest []byte, err error) 
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o4, o5, o6, o7 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -164,6 +165,148 @@ func (i *IntegrationUint) UnmarshalSSZTail(buf []byte) (rest []byte, err error) 
 		return nil, err
 	}
 
+	return
+}
+
+// EncodeSSZ encodes the IntegrationUint object
+func (i *IntegrationUint) Encode(dst io.Writer) (int, error) {
+	buf, err := ssz.MarshalSSZ(i)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the IntegrationUint from an io.Reader
+func (i *IntegrationUint) Decode(src io.Reader, limit int) (n int, err error) {
+	fixedSize := i.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	var read int
+	var o4, o5, o6, o7 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
+
+	// Field (0) 'A'
+	read, err = ssz.DecodeValue[uint8](&i.A, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'B'
+	read, err = ssz.DecodeValue[uint16](&i.B, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'C'
+	read, err = ssz.DecodeValue[uint32](&i.C, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'D'
+	read, err = ssz.DecodeValue[uint64](&i.D, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (4) 'A1'
+	o4, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (5) 'A2'
+	o5, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (6) 'A3'
+	o6, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (7) 'A4'
+	o7, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'A1'
+	read, err = ssz.DecodeSliceWithIndexCallback(&i.A1, src, int(o5-o4), 1, 400, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint8](&i.A1[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'A2'
+	read, err = ssz.DecodeSliceWithIndexCallback(&i.A2, src, int(o6-o5), 2, 400, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint16](&i.A2[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'A3'
+	read, err = ssz.DecodeSliceWithIndexCallback(&i.A3, src, int(o7-o6), 4, 400, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint32](&i.A3[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'A4'
+	read, err = ssz.DecodeSliceWithIndexCallback(&i.A4, src, int(uint64(limit)-o7), 8, 400, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint64](&i.A4[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
 	return
 }
 

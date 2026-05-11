@@ -1,5 +1,9 @@
 package ssz
 
+import (
+	"io"
+)
+
 // Marshaler is the interface implemented by types that can marshal themselves into valid SZZ.
 type Marshaler interface {
 	MarshalSSZTo(dst []byte) ([]byte, error)
@@ -15,6 +19,16 @@ type SSZSizer interface {
 type Unmarshaler interface {
 	UnmarshalSSZ(buf []byte) error
 	UnmarshalSSZTail(buf []byte) ([]byte, error)
+}
+
+type Decoder interface {
+	Unmarshaler
+	Decode(src io.Reader, limit int) (int, error)
+}
+
+type Encoder interface {
+	Marshaler
+	Encode(dst io.Writer) (int, error)
 }
 
 type HashRoot interface {
@@ -52,7 +66,7 @@ type HashWalker interface {
 
 type PtrConstraint[T any] interface {
 	*T
-	Unmarshaler
+	Decoder
 	SSZSizer
 }
 
@@ -68,6 +82,13 @@ func UnmarshalField[T any, PT PtrConstraint[T]](field *PT, buf []byte) error {
 		*field = PT(new(T))
 	}
 	return (*field).UnmarshalSSZ(buf)
+}
+
+func DecodeField[T any, PT PtrConstraint[T]](field *PT, src io.Reader, toRead int) (int, error) {
+	if *field == nil {
+		*field = PT(new(T))
+	}
+	return (*field).Decode(src, toRead)
 }
 
 // UnmarshalSliceWithIndexCallback handles slices with index-aware unmarshal logic
@@ -94,6 +115,34 @@ func UnmarshalSliceWithIndexCallback[T any](
 	return nil
 }
 
+func DecodeSliceWithIndexCallback[T any](
+	slice *[]T,
+	src io.Reader,
+	limit int,
+	itemSize uint64,
+	maxItems uint64,
+	unmarshalCallback func(uint64, io.Reader, int) (int, error),
+) (int, error) {
+	var n int
+	num, err := DivideInt2(uint64(limit), itemSize, maxItems)
+	if err != nil {
+		return 0, err
+	}
+
+	*slice = Extend(*slice, num)
+	for ii := uint64(0); ii < num; ii++ {
+		read, err := unmarshalCallback(ii, src, int(itemSize))
+		n += read
+		if err != nil {
+			return n, err
+		}
+	}
+	if n != limit {
+		return n, ErrSize
+	}
+	return n, nil
+}
+
 // UnmarshalDynamicSliceWithCallback handles dynamic slices with custom unmarshal logic
 func UnmarshalDynamicSliceWithCallback[T any](
 	slice *[]T,
@@ -108,6 +157,27 @@ func UnmarshalDynamicSliceWithCallback[T any](
 
 	*slice = Extend(*slice, num)
 	return UnmarshalDynamic(buf, num, unmarshalCallback)
+}
+
+func DecodeDynamicSliceWithCallback[T any](
+	slice *[]T,
+	src io.Reader,
+	toRead int,
+	maxElements uint64,
+	decodeCallback func(uint64, io.Reader, int) (int, error),
+) (n int, err error) {
+	var read int
+
+	resize := func(newLen uint64) {
+		*slice = Extend(*slice, newLen)
+	}
+	// Decode the rest of the offsets and the list
+	read, err = DecodeDynamic(src, toRead, maxElements, decodeCallback, resize)
+	n += read
+	if err != nil {
+		return n, err
+	}
+	return n, nil
 }
 
 func UnmarshalSliceSSZ[T any, PT PtrConstraint[T]](
@@ -126,6 +196,22 @@ func UnmarshalSliceSSZ[T any, PT PtrConstraint[T]](
 		})
 }
 
+func DecodeSliceSSZ[T any, PT PtrConstraint[T]](
+	slice *[]PT,
+	src io.Reader,
+	limit int,
+	maxItems uint64,
+) (int, error) {
+	var zero T
+	var zeroPtr PT = PT(&zero)
+	itemSize := uint64(zeroPtr.SizeSSZ())
+
+	return DecodeSliceWithIndexCallback(slice, src, limit, itemSize, maxItems,
+		func(ii uint64, src io.Reader, itemSize int) (int, error) {
+			return DecodeField[T, PT](&(*slice)[ii], src, itemSize)
+		})
+}
+
 // UnmarshalDynamicSliceSSZ handles dynamic slices of SSZ types
 func UnmarshalDynamicSliceSSZ[T any, PT PtrConstraint[T]](
 	slice *[]PT,
@@ -138,6 +224,18 @@ func UnmarshalDynamicSliceSSZ[T any, PT PtrConstraint[T]](
 		})
 }
 
+func DecodeDynamicSliceSSZ[T any, PT PtrConstraint[T]](
+	slice *[]PT,
+	src io.Reader,
+	toRead int,
+	maxElements uint64,
+) (int, error) {
+	return DecodeDynamicSliceWithCallback(slice, src, toRead, maxElements,
+		func(indx uint64, src io.Reader, elementLimit int) (int, error) {
+			return DecodeField[T, PT](&(*slice)[indx], src, elementLimit)
+		})
+}
+
 func UnmarshalSSZ(v Unmarshaler, buf []byte) error {
 	tail, err := v.UnmarshalSSZTail(buf)
 	if err != nil {
@@ -147,4 +245,12 @@ func UnmarshalSSZ(v Unmarshaler, buf []byte) error {
 		return ErrTailNotEmpty
 	}
 	return err
+}
+
+func Decode(v Decoder, src io.Reader, limit int) (int, error) {
+	return v.Decode(src, limit)
+}
+
+func Encode(v Encoder, dst io.Writer) (int, error) {
+	return v.Encode(dst)
 }

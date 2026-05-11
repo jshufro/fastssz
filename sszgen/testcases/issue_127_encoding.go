@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -55,7 +57,6 @@ func (o *Obj2) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -75,6 +76,53 @@ func (o *Obj2) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 		return nil, err
 	}
 
+	return
+}
+
+// EncodeSSZ encodes the Obj2 object
+func (o *Obj2) Encode(dst io.Writer) (int, error) {
+	buf, err := ssz.MarshalSSZ(o)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Obj2 from an io.Reader
+func (o *Obj2) Decode(src io.Reader, limit int) (n int, err error) {
+	fixedSize := o.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
+
+	// Offset (0) 'T1'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'T1'
+	read, err = ssz.DecodeDynamicSliceWithCallback(&o.T1, src, int(uint64(limit)-o0), 1024, func(indx uint64, src io.Reader, elementLimit int) (n int, err error) {
+		read, o.T1[indx], err = ssz.DecodeDynamicBytes(o.T1[indx], src, elementLimit, 256)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
 	return
 }
 

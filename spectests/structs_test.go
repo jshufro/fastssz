@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,6 +17,8 @@ import (
 )
 
 type codec interface {
+	ssz.Encoder
+	ssz.Decoder
 	ssz.Marshaler
 	ssz.Unmarshaler
 	ssz.HashRoot
@@ -212,6 +214,19 @@ func checkSSZEncoding(t *testing.T, rootObj ssz.Unmarshaler, fork fork, fileName
 		fatal("marshalSSZ_equal", fmt.Errorf("bad marshal"))
 	}
 
+	// Encode
+	encodedBuf := bytes.NewBuffer(make([]byte, 0, obj.SizeSSZ()))
+	encodedLen, err := obj.Encode(encodedBuf)
+	if err != nil {
+		fatal("Encode", err)
+	}
+	if encodedLen != obj.SizeSSZ() {
+		fatal("Encode_size", fmt.Errorf("bad encode size"))
+	}
+	if !bytes.Equal(encodedBuf.Bytes(), output.ssz) {
+		fatal("Encode_equal", fmt.Errorf("bad encode"))
+	}
+
 	// Unmarshal
 	obj2 := base(fork)
 	if err := obj2.UnmarshalSSZ(output.ssz); err != nil {
@@ -219,6 +234,20 @@ func checkSSZEncoding(t *testing.T, rootObj ssz.Unmarshaler, fork fork, fileName
 	}
 	if !deepEqual(obj, obj2) {
 		fatal("UnmarshalSSZ_equal", fmt.Errorf("bad unmarshal"))
+	}
+
+	// Decode
+	obj3 := base(fork)
+	srcBuf := bytes.NewReader(output.ssz)
+	decodedLen, err := obj3.Decode(srcBuf, len(output.ssz))
+	if err != nil {
+		fatal("Decode", err)
+	}
+	if decodedLen != obj.SizeSSZ() || decodedLen != len(output.ssz) {
+		fatal("Decode_size", fmt.Errorf("bad decode size"))
+	}
+	if !deepEqual(obj, obj3) {
+		fatal("Decode_equal", fmt.Errorf("bad decode"))
 	}
 
 	// Try to decode on top of rootObj to ensure the fast unmarshalling works
@@ -262,11 +291,11 @@ func checkSSZEncoding(t *testing.T, rootObj ssz.Unmarshaler, fork fork, fileName
 	}
 }
 
-const benchmarkTestCase = "../eth2.0-spec-tests/tests/mainnet/phase0/ssz_static/BeaconBlock/ssz_random/case_4"
+const benchmarkTestCase = "../consensus-spec-tests/tests/mainnet/phase0/ssz_static/BeaconBlock/ssz_random/case_4"
 
 func BenchmarkMarshal_Fast(b *testing.B) {
 	obj := new(BeaconBlock)
-	readValidGenericSSZ(nil, benchmarkTestCase, obj)
+	readValidGenericSSZ(b, benchmarkTestCase, obj)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -275,10 +304,9 @@ func BenchmarkMarshal_Fast(b *testing.B) {
 		obj.MarshalSSZ()
 	}
 }
-
 func BenchmarkMarshal_SuperFast(b *testing.B) {
 	obj := new(BeaconBlock)
-	readValidGenericSSZ(nil, benchmarkTestCase, obj)
+	readValidGenericSSZ(b, benchmarkTestCase, obj)
 
 	buf := make([]byte, 0)
 
@@ -290,9 +318,37 @@ func BenchmarkMarshal_SuperFast(b *testing.B) {
 	}
 }
 
+func BenchmarkEncode_Fast(b *testing.B) {
+	obj := new(BeaconBlock)
+	readValidGenericSSZ(b, benchmarkTestCase, obj)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		buf := bytes.NewBuffer(make([]byte, 0, obj.SizeSSZ()))
+		obj.Encode(buf)
+	}
+}
+
+func BenchmarkEncode_SuperFast(b *testing.B) {
+	obj := new(BeaconBlock)
+	readValidGenericSSZ(b, benchmarkTestCase, obj)
+
+	buf := bytes.NewBuffer(make([]byte, 0, obj.SizeSSZ()))
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		obj.Encode(buf)
+		buf.Reset()
+	}
+}
+
 func BenchmarkUnMarshal_Fast(b *testing.B) {
 	obj := new(BeaconBlock)
-	readValidGenericSSZ(nil, benchmarkTestCase, obj)
+	readValidGenericSSZ(b, benchmarkTestCase, obj)
 
 	dst, err := obj.MarshalSSZ()
 	if err != nil {
@@ -310,9 +366,30 @@ func BenchmarkUnMarshal_Fast(b *testing.B) {
 	}
 }
 
+func BenchmarkDecode_Fast(b *testing.B) {
+	obj := new(BeaconBlock)
+	readValidGenericSSZ(b, benchmarkTestCase, obj)
+
+	src, err := obj.MarshalSSZ()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		srcBuf := bytes.NewReader(src)
+		_, err := obj.Decode(srcBuf, obj.SizeSSZ())
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkHashTreeRoot_Fast(b *testing.B) {
 	obj := new(BeaconBlock)
-	readValidGenericSSZ(nil, benchmarkTestCase, obj)
+	readValidGenericSSZ(b, benchmarkTestCase, obj)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -326,7 +403,7 @@ func BenchmarkHashTreeRoot_Fast(b *testing.B) {
 
 func BenchmarkHashTreeRoot_SuperFast(b *testing.B) {
 	obj := new(BeaconBlock)
-	readValidGenericSSZ(nil, benchmarkTestCase, obj)
+	readValidGenericSSZ(b, benchmarkTestCase, obj)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -340,7 +417,7 @@ func BenchmarkHashTreeRoot_SuperFast(b *testing.B) {
 
 func BenchmarkProof_Tree(b *testing.B) {
 	obj := new(BeaconBlock)
-	readValidGenericSSZ(nil, benchmarkTestCase, obj)
+	readValidGenericSSZ(b, benchmarkTestCase, obj)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -351,14 +428,14 @@ func BenchmarkProof_Tree(b *testing.B) {
 }
 
 const (
-	testsPath      = "../eth2.0-spec-tests/tests"
+	testsPath      = "../consensus-spec-tests/tests"
 	serializedFile = "serialized.ssz_snappy"
 	valueFile      = "value.yaml"
 	rootsFile      = "roots.yaml"
 )
 
 func readDir(t *testing.T, path string) []string {
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,8 +451,8 @@ type output struct {
 	ssz  []byte
 }
 
-func readValidGenericSSZ(t *testing.T, path string, obj interface{}) *output {
-	serializedSnappy, err := ioutil.ReadFile(filepath.Join(path, serializedFile))
+func readValidGenericSSZ(t testing.TB, path string, obj interface{}) *output {
+	serializedSnappy, err := os.ReadFile(filepath.Join(path, serializedFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,11 +461,11 @@ func readValidGenericSSZ(t *testing.T, path string, obj interface{}) *output {
 		t.Fatal(err)
 	}
 
-	raw, err := ioutil.ReadFile(filepath.Join(path, valueFile))
+	raw, err := os.ReadFile(filepath.Join(path, valueFile))
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw2, err := ioutil.ReadFile(filepath.Join(path, rootsFile))
+	raw2, err := os.ReadFile(filepath.Join(path, rootsFile))
 	if err != nil {
 		t.Fatal(err)
 	}

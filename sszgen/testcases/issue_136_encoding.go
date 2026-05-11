@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -43,6 +45,37 @@ func (i *Issue136) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	}
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the Issue136 object
+func (i *Issue136) Encode(dst io.Writer) (int, error) {
+	buf, err := ssz.MarshalSSZ(i)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Issue136 from an io.Reader
+func (i *Issue136) Decode(src io.Reader, limit int) (n int, err error) {
+	fixedSize := i.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	var read int
+
+	// Field (0) 'C'
+	read, err = i.C.Decode(src, i.C.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Issue136 object

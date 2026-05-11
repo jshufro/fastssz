@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 )
 
@@ -45,6 +47,44 @@ func (t *TimeType) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	t.Int, buf = ssz.UnmarshallValue[uint64](buf)
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the TimeType object
+func (t *TimeType) Encode(dst io.Writer) (int, error) {
+	buf, err := ssz.MarshalSSZ(t)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the TimeType from an io.Reader
+func (t *TimeType) Decode(src io.Reader, limit int) (n int, err error) {
+	fixedSize := t.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	var read int
+
+	// Field (0) 'Timestamp'
+	read, err = ssz.DecodeTime(&t.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Int'
+	read, err = ssz.DecodeValue[uint64](&t.Int, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the TimeType object
@@ -120,6 +160,44 @@ func (t *TimeRawType) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	t.Int, buf = ssz.UnmarshallValue[uint64](buf)
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the TimeRawType object
+func (t *TimeRawType) Encode(dst io.Writer) (int, error) {
+	buf, err := ssz.MarshalSSZ(t)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the TimeRawType from an io.Reader
+func (t *TimeRawType) Decode(src io.Reader, limit int) (n int, err error) {
+	fixedSize := t.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	var read int
+
+	// Field (0) 'Timestamp'
+	read, err = ssz.DecodeValue[uint64](&t.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Int'
+	read, err = ssz.DecodeValue[uint64](&t.Int, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the TimeRawType object

@@ -4,6 +4,8 @@
 package testcases
 
 import (
+	"io"
+
 	ssz "github.com/ferranbt/fastssz"
 	"github.com/ferranbt/fastssz/sszgen/testcases/other"
 	alias "github.com/ferranbt/fastssz/sszgen/testcases/other2"
@@ -84,6 +86,69 @@ func (c *Case4) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	buf = ssz.UnmarshalFixedBytes(c.E[:], buf)
 
 	return buf, nil
+}
+
+// EncodeSSZ encodes the Case4 object
+func (c *Case4) Encode(dst io.Writer) (int, error) {
+	buf, err := ssz.MarshalSSZ(c)
+	if err != nil {
+		return 0, err
+	}
+	return dst.Write(buf)
+
+}
+
+// DecodeSSZ unmarshals the Case4 from an io.Reader
+func (c *Case4) Decode(src io.Reader, limit int) (n int, err error) {
+	fixedSize := c.fixedSize()
+	if limit < fixedSize {
+		return 0, ssz.ErrSize
+	}
+	var read int
+
+	// Field (0) 'A'
+	read, err = c.A.Decode(src, c.A.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'B'
+	read, err = ssz.DecodeField(&c.B, src, c.B.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'C'
+	{
+		var val uint64
+		read, err = ssz.DecodeValue[uint64](&val, src)
+		n += read
+		if err != nil {
+			return
+		}
+		c.C = alias.Case4Slot(val)
+	}
+
+	// Field (3) 'D'
+	read, c.D, err = ssz.DecodeBytes(c.D, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'E'
+	read, err = io.ReadFull(src, c.E[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Case4 object

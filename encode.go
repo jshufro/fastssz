@@ -3,6 +3,7 @@ package ssz
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math/bits"
 	"time"
 )
@@ -52,6 +53,15 @@ func UnmarshalBitList(dst []byte, src []byte, bitLimit uint64) ([]byte, error) {
 	return dst, nil
 }
 
+func DecodeBitList(dst []byte, src io.Reader, toRead int, bitLimit uint64) (int, []byte, error) {
+	dst = Extend(dst, uint64(toRead))
+	read, err := io.ReadFull(src, dst)
+	if err != nil {
+		return read, dst, err
+	}
+	return read, dst, ValidateBitlist(dst, bitLimit)
+}
+
 func UnmarshalFixedBytes(buf []byte, src []byte) []byte {
 	targetSize := len(buf)
 	copy(buf, src[:targetSize])
@@ -69,6 +79,15 @@ func UnmarshalDynamicBytes(src []byte, buf []byte, maxSize ...int) ([]byte, erro
 	return src, nil
 }
 
+func DecodeDynamicBytes(dst []byte, src io.Reader, toRead int, maxSize ...int) (int, []byte, error) {
+	if len(maxSize) > 0 && toRead > maxSize[0] {
+		return 0, dst, ErrBytesLength
+	}
+	dst = Extend(dst, uint64(toRead))
+	read, err := io.ReadFull(src, dst)
+	return read, dst, err
+}
+
 // UnmarshalBytes unmarshals a byte slice from the src input
 // If the src is nil, it will create a new byte slice with the content of buf.
 func UnmarshalBytes(src []byte, buf []byte, size uint64) ([]byte, []byte) {
@@ -77,6 +96,13 @@ func UnmarshalBytes(src []byte, buf []byte, size uint64) ([]byte, []byte) {
 	}
 	src = append(src, buf[:size]...)
 	return src, buf[size:]
+}
+
+// DecodeBytes decodes a byte slice from the src input
+func DecodeBytes(dst []byte, src io.Reader, size uint64) (int, []byte, error) {
+	dst = Extend(dst, size)
+	read, err := io.ReadFull(src, dst)
+	return read, dst, err
 }
 
 type UnmarshallableType interface {
@@ -110,10 +136,52 @@ func UnmarshallValue[T UnmarshallableType](src []byte) (T, []byte) {
 	return result.(T), tail
 }
 
+// DecodeValue decodes a value from the src input
+func DecodeValue[T UnmarshallableType](dst *T, src io.Reader) (int, error) {
+	var size int
+	switch any(*new(T)).(type) {
+	case uint8, bool:
+		size = 1
+	case uint16:
+		size = 2
+	case uint32:
+		size = 4
+	case uint64:
+		size = 8
+	default:
+		panic("unsupported type")
+	}
+	buf := make([]byte, size)
+	read, err := io.ReadFull(src, buf)
+	if err != nil {
+		return read, err
+	}
+	switch any(*new(T)).(type) {
+	case bool:
+		if err := IsValidBool(buf); err != nil {
+			return read, err
+		}
+	}
+	val, _ := UnmarshallValue[T](buf)
+	*dst = val
+	return read, nil
+}
+
 // UnmarshalTime unmarshals a time.Time from the src input
 func UnmarshalTime(src []byte) (time.Time, []byte) {
 	val, buf := UnmarshallValue[uint64](src)
 	return time.Unix(int64(val), 0).UTC(), buf
+}
+
+// DecodeTime decodes a time.Time from the src input
+func DecodeTime(dst *time.Time, src io.Reader) (int, error) {
+	buf := make([]byte, 8)
+	read, err := io.ReadFull(src, buf)
+	if err != nil {
+		return read, err
+	}
+	*dst, _ = UnmarshalTime(buf)
+	return read, nil
 }
 
 func IsValidBool(src []byte) error {
@@ -180,6 +248,17 @@ func WriteOffset(dst []byte, i int) []byte {
 func ReadOffset(buf []byte) (uint64, []byte) {
 	offset, buf := UnmarshallValue[uint32](buf)
 	return uint64(offset), buf
+}
+
+func DecodeOffset(dst *uint64, src io.Reader) (int, error) {
+	buf := make([]byte, 4)
+	read, err := io.ReadFull(src, buf)
+	if err != nil {
+		return read, err
+	}
+	offset, _ := UnmarshallValue[uint32](buf)
+	*dst = uint64(offset)
+	return read, nil
 }
 
 func safeReadOffset(buf []byte) (uint64, []byte, error) {
@@ -330,6 +409,72 @@ func UnmarshalDynamic(src []byte, length uint64, f func(indx uint64, b []byte) e
 	return nil
 }
 
+func DecodeDynamic(
+	src io.Reader, toRead int,
+	maxElements uint64,
+	decodeCallback func(uint64, io.Reader, int) (int, error),
+	resize func(uint64),
+) (n int, err error) {
+	var read int
+
+	if toRead == 0 {
+		return 0, nil
+	}
+	if toRead < 4 {
+		return 0, ErrSize
+	}
+
+	// Decode the first offset, which will give us the length
+	var firstOffset uint64
+	read, err = DecodeOffset(&firstOffset, src)
+	n += read
+
+	// Calculate the number of elements based on the number of offsets
+	num, ok := DivideInt(firstOffset, bytesPerLengthOffset)
+	if !ok {
+		return n, fmt.Errorf("incorrect length division")
+	}
+	if num > maxElements {
+		return n, fmt.Errorf("too big for the list")
+	} else if num == 0 {
+		return n, nil
+	}
+
+	resize(num)
+
+	allOffsets := make([]uint64, num)
+	allOffsets[0] = firstOffset
+
+	// Decode the remaining offsets
+	for i := uint64(1); i < num; i++ {
+		read, err = DecodeOffset(&allOffsets[i], src)
+		n += read
+		if err != nil {
+			return n, err
+		}
+	}
+
+	// Decode the dynamic items
+	for i := uint64(0); i < num; i++ {
+		var end uint64
+		if i == num-1 {
+			// The last dynamic item reads to the end of the limit
+			end = uint64(toRead)
+		} else {
+			end = allOffsets[i+1]
+		}
+		read, err = decodeCallback(i, src, int(end-allOffsets[i]))
+		n += read
+		if err != nil {
+			return n, err
+		}
+	}
+	if n != toRead {
+		return n, ErrSize
+	}
+	return n, nil
+}
+
 func DivideInt2(a, b, max uint64) (uint64, error) {
 	num, ok := DivideInt(a, b)
 	if !ok {
@@ -360,6 +505,17 @@ func NewOffsetMarker(totalSize, fixedSize uint64) *OffsetMarker {
 		LastOffset: 0,
 		HasOffset:  false,
 	}
+}
+
+// DecodeOffset decodes an offset from the src input
+func (o *OffsetMarker) DecodeOffset(src io.Reader) (uint64, int, error) {
+	var buf [4]byte
+	n, err := io.ReadFull(src, buf[:])
+	if err != nil {
+		return 0, n, err
+	}
+	offset, _, err := o.ReadOffset(buf[:])
+	return offset, n, err
 }
 
 func (o *OffsetMarker) ReadOffset(buf []byte) (uint64, []byte, error) {

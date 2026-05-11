@@ -18,7 +18,7 @@ Clone:
 $ git clone git@github.com:ferranbt/fastssz.git
 ```
 
-Download the eth2.0 spec tests
+Download the consensus spec tests
 
 ```
 $ make get-spec-tests
@@ -125,6 +125,6 @@ type ExecutionPayload struct {
 
 FastSSZ generates code that references the specified variable for size constraints and comparisons, but does not generate the variable itself. You must provide a uint64 variable with the specified name in the destination package.
 
-This feature has been tested on the [Ethereum eth2.0 specs](https://github.com/ferranbt/fastssz/blob/main/spectests/structs.go) and all types from there are supported. However, some edge cases might not be fully ready yet - please open an issue if you encounter any problems.
+This feature has been tested on the [Ethereum consensus specs](https://github.com/ferranbt/fastssz/blob/main/spectests/structs.go) and all types from there are supported. However, some edge cases might not be fully ready yet - please open an issue if you encounter any problems.
 
 Using these variables does not add any performance overhead to the generated SSZ operations.
