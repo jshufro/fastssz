@@ -68,21 +68,31 @@ func (i *Issue188) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Issue188 from an io.Reader
-func (i *Issue188) Decode(src io.Reader, limit int) (int, error) {
+func (i *Issue188) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := i.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = i.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Name'
+	read, i.Name, err = ssz.DecodeBytes(i.Name, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Address'
+	read, i.Address, err = ssz.DecodeBytes(i.Address, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Issue188 object

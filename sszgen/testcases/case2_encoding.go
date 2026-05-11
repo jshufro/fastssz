@@ -54,21 +54,24 @@ func (c *Case2A) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Case2A from an io.Reader
-func (c *Case2A) Decode(src io.Reader, limit int) (int, error) {
+func (c *Case2A) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := c.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = c.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'A'
+	read, err = ssz.DecodeValue[uint64](&c.A, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Case2A object
@@ -154,21 +157,31 @@ func (c *Case2B) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Case2B from an io.Reader
-func (c *Case2B) Decode(src io.Reader, limit int) (int, error) {
+func (c *Case2B) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := c.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = c.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'A'
+	read, err = ssz.DecodeValue[uint64](&c.A, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'B'
+	read, err = ssz.DecodeValue[uint64](&c.B, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Case2B object

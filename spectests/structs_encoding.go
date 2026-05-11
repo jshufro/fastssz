@@ -48,7 +48,6 @@ func (a *AggregateAndProof) UnmarshalSSZTail(buf []byte) (rest []byte, err error
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o1 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -83,21 +82,47 @@ func (a *AggregateAndProof) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the AggregateAndProof from an io.Reader
-func (a *AggregateAndProof) Decode(src io.Reader, limit int) (int, error) {
+func (a *AggregateAndProof) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := a.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = a.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o1 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'Index'
+	read, err = ssz.DecodeValue[uint64](&a.Index, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (1) 'Aggregate'
+	o1, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'SelectionProof'
+	read, err = io.ReadFull(src, a.SelectionProof[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Aggregate'
+	read, err = ssz.DecodeField(&a.Aggregate, io.LimitReader(src, int64(int(uint64(limit)-o1))), int(uint64(limit)-o1))
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the AggregateAndProof object
@@ -202,21 +227,31 @@ func (c *Checkpoint) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Checkpoint from an io.Reader
-func (c *Checkpoint) Decode(src io.Reader, limit int) (int, error) {
+func (c *Checkpoint) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := c.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = c.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Epoch'
+	read, err = ssz.DecodeValue[uint64](&c.Epoch, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Root'
+	read, c.Root, err = ssz.DecodeBytes(c.Root, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Checkpoint object
@@ -345,21 +380,56 @@ func (a *AttestationData) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the AttestationData from an io.Reader
-func (a *AttestationData) Decode(src io.Reader, limit int) (int, error) {
+func (a *AttestationData) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := a.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = a.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Slot'
+	{
+		var val uint64
+		read, err = ssz.DecodeValue[uint64](&val, src)
+		n += read
+		if err != nil {
+			return
+		}
+		a.Slot = Slot(val)
+	}
+
+	// Field (1) 'Index'
+	read, err = ssz.DecodeValue[uint64](&a.Index, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'BeaconBlockHash'
+	read, err = io.ReadFull(src, a.BeaconBlockHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'Source'
+	read, err = ssz.DecodeField(&a.Source, src, a.Source.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'Target'
+	read, err = ssz.DecodeField(&a.Target, src, a.Target.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the AttestationData object
@@ -462,7 +532,6 @@ func (a *Attestation) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -499,21 +568,47 @@ func (a *Attestation) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Attestation from an io.Reader
-func (a *Attestation) Decode(src io.Reader, limit int) (int, error) {
+func (a *Attestation) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := a.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = a.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'AggregationBits'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Data'
+	read, err = ssz.DecodeField(&a.Data, src, a.Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Signature'
+	read, err = io.ReadFull(src, a.Signature[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'AggregationBits'
+	read, a.AggregationBits, err = ssz.DecodeBitList(a.AggregationBits, src, int(uint64(limit)-o0), 2048)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Attestation object
@@ -634,21 +729,45 @@ func (d *DepositData) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the DepositData from an io.Reader
-func (d *DepositData) Decode(src io.Reader, limit int) (int, error) {
+func (d *DepositData) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := d.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = d.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Pubkey'
+	read, err = io.ReadFull(src, d.Pubkey[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'WithdrawalCredentials'
+	read, err = io.ReadFull(src, d.WithdrawalCredentials[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Amount'
+	read, err = ssz.DecodeValue[uint64](&d.Amount, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'Signature'
+	read, d.Signature, err = ssz.DecodeBytes(d.Signature, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the DepositData object
@@ -767,21 +886,34 @@ func (d *Deposit) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Deposit from an io.Reader
-func (d *Deposit) Decode(src io.Reader, limit int) (int, error) {
+func (d *Deposit) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := d.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = d.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Proof'
+	d.Proof = make([][]byte, 33)
+	for ii := uint64(0); ii < 33; ii++ {
+		read, d.Proof[ii], err = ssz.DecodeBytes(d.Proof[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (1) 'Data'
+	read, err = ssz.DecodeField(&d.Data, src, d.Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Deposit object
@@ -903,21 +1035,38 @@ func (d *DepositMessage) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the DepositMessage from an io.Reader
-func (d *DepositMessage) Decode(src io.Reader, limit int) (int, error) {
+func (d *DepositMessage) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := d.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = d.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Pubkey'
+	read, d.Pubkey, err = ssz.DecodeBytes(d.Pubkey, src, 48)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'WithdrawalCredentials'
+	read, d.WithdrawalCredentials, err = ssz.DecodeBytes(d.WithdrawalCredentials, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Amount'
+	read, err = ssz.DecodeValue[uint64](&d.Amount, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the DepositMessage object
@@ -1018,7 +1167,6 @@ func (i *IndexedAttestation) UnmarshalSSZTail(buf []byte) (rest []byte, err erro
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -1058,21 +1206,55 @@ func (i *IndexedAttestation) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the IndexedAttestation from an io.Reader
-func (i *IndexedAttestation) Decode(src io.Reader, limit int) (int, error) {
+func (i *IndexedAttestation) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := i.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = i.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'AttestationIndices'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Data'
+	read, err = ssz.DecodeField(&i.Data, src, i.Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Signature'
+	read, i.Signature, err = ssz.DecodeBytes(i.Signature, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'AttestationIndices'
+	read, err = ssz.DecodeSliceWithIndexCallback(&i.AttestationIndices, src, int(uint64(limit)-o0), 8, 2048, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint64](&i.AttestationIndices[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the IndexedAttestation object
@@ -1187,7 +1369,6 @@ func (p *PendingAttestation) UnmarshalSSZTail(buf []byte) (rest []byte, err erro
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -1227,21 +1408,54 @@ func (p *PendingAttestation) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the PendingAttestation from an io.Reader
-func (p *PendingAttestation) Decode(src io.Reader, limit int) (int, error) {
+func (p *PendingAttestation) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := p.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = p.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'AggregationBits'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Data'
+	read, err = ssz.DecodeField(&p.Data, src, p.Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'InclusionDelay'
+	read, err = ssz.DecodeValue[uint64](&p.InclusionDelay, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ProposerIndex'
+	read, err = ssz.DecodeValue[uint64](&p.ProposerIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'AggregationBits'
+	read, p.AggregationBits, err = ssz.DecodeBitList(p.AggregationBits, src, int(uint64(limit)-o0), 2048)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the PendingAttestation object
@@ -1363,21 +1577,38 @@ func (f *Fork) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Fork from an io.Reader
-func (f *Fork) Decode(src io.Reader, limit int) (int, error) {
+func (f *Fork) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := f.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = f.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'PreviousVersion'
+	read, f.PreviousVersion, err = ssz.DecodeBytes(f.PreviousVersion, src, 4)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'CurrentVersion'
+	read, f.CurrentVersion, err = ssz.DecodeBytes(f.CurrentVersion, src, 4)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Epoch'
+	read, err = ssz.DecodeValue[uint64](&f.Epoch, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Fork object
@@ -1524,21 +1755,73 @@ func (v *Validator) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Validator from an io.Reader
-func (v *Validator) Decode(src io.Reader, limit int) (int, error) {
+func (v *Validator) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := v.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = v.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Pubkey'
+	read, v.Pubkey, err = ssz.DecodeBytes(v.Pubkey, src, 48)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'WithdrawalCredentials'
+	read, v.WithdrawalCredentials, err = ssz.DecodeBytes(v.WithdrawalCredentials, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'EffectiveBalance'
+	read, err = ssz.DecodeValue[uint64](&v.EffectiveBalance, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'Slashed'
+	read, err = ssz.DecodeValue[bool](&v.Slashed, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'ActivationEligibilityEpoch'
+	read, err = ssz.DecodeValue[uint64](&v.ActivationEligibilityEpoch, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'ActivationEpoch'
+	read, err = ssz.DecodeValue[uint64](&v.ActivationEpoch, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'ExitEpoch'
+	read, err = ssz.DecodeValue[uint64](&v.ExitEpoch, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'WithdrawableEpoch'
+	read, err = ssz.DecodeValue[uint64](&v.WithdrawableEpoch, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Validator object
@@ -1653,21 +1936,31 @@ func (v *VoluntaryExit) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the VoluntaryExit from an io.Reader
-func (v *VoluntaryExit) Decode(src io.Reader, limit int) (int, error) {
+func (v *VoluntaryExit) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := v.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = v.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Epoch'
+	read, err = ssz.DecodeValue[uint64](&v.Epoch, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'ValidatorIndex'
+	read, err = ssz.DecodeValue[uint64](&v.ValidatorIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the VoluntaryExit object
@@ -1763,21 +2056,31 @@ func (s *SignedVoluntaryExit) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the SignedVoluntaryExit from an io.Reader
-func (s *SignedVoluntaryExit) Decode(src io.Reader, limit int) (int, error) {
+func (s *SignedVoluntaryExit) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := s.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Exit'
+	read, err = ssz.DecodeField(&s.Exit, src, s.Exit.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Signature'
+	read, err = io.ReadFull(src, s.Signature[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the SignedVoluntaryExit object
@@ -1881,21 +2184,38 @@ func (e *Eth1Block) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Eth1Block from an io.Reader
-func (e *Eth1Block) Decode(src io.Reader, limit int) (int, error) {
+func (e *Eth1Block) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Timestamp'
+	read, err = ssz.DecodeValue[uint64](&e.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'DepositRoot'
+	read, e.DepositRoot, err = ssz.DecodeBytes(e.DepositRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'DepositCount'
+	read, err = ssz.DecodeValue[uint64](&e.DepositCount, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Eth1Block object
@@ -2005,21 +2325,38 @@ func (e *Eth1Data) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Eth1Data from an io.Reader
-func (e *Eth1Data) Decode(src io.Reader, limit int) (int, error) {
+func (e *Eth1Data) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'DepositRoot'
+	read, e.DepositRoot, err = ssz.DecodeBytes(e.DepositRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'DepositCount'
+	read, err = ssz.DecodeValue[uint64](&e.DepositCount, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'BlockHash'
+	read, e.BlockHash, err = ssz.DecodeBytes(e.BlockHash, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Eth1Data object
@@ -2127,21 +2464,31 @@ func (s *SigningRoot) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the SigningRoot from an io.Reader
-func (s *SigningRoot) Decode(src io.Reader, limit int) (int, error) {
+func (s *SigningRoot) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := s.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'ObjectRoot'
+	read, s.ObjectRoot, err = ssz.DecodeBytes(s.ObjectRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Domain'
+	read, s.Domain, err = ssz.DecodeBytes(s.Domain, src, 8)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the SigningRoot object
@@ -2256,21 +2603,37 @@ func (h *HistoricalBatch) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the HistoricalBatch from an io.Reader
-func (h *HistoricalBatch) Decode(src io.Reader, limit int) (int, error) {
+func (h *HistoricalBatch) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := h.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = h.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'BlockRoots'
+	h.BlockRoots = make([][32]byte, historicalRoots)
+	for ii := uint64(0); ii < historicalRoots; ii++ {
+		read, err = io.ReadFull(src, h.BlockRoots[ii][:])
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (1) 'StateRoots'
+	h.StateRoots = make([][32]byte, historicalRoots)
+	for ii := uint64(0); ii < historicalRoots; ii++ {
+		read, err = io.ReadFull(src, h.StateRoots[ii][:])
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the HistoricalBatch object
@@ -2393,21 +2756,31 @@ func (p *ProposerSlashing) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ProposerSlashing from an io.Reader
-func (p *ProposerSlashing) Decode(src io.Reader, limit int) (int, error) {
+func (p *ProposerSlashing) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := p.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = p.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Header1'
+	read, err = ssz.DecodeField(&p.Header1, src, p.Header1.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Header2'
+	read, err = ssz.DecodeField(&p.Header2, src, p.Header2.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ProposerSlashing object
@@ -2500,7 +2873,6 @@ func (a *AttesterSlashing) UnmarshalSSZTail(buf []byte) (rest []byte, err error)
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0, o1 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -2539,21 +2911,47 @@ func (a *AttesterSlashing) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the AttesterSlashing from an io.Reader
-func (a *AttesterSlashing) Decode(src io.Reader, limit int) (int, error) {
+func (a *AttesterSlashing) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := a.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = a.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0, o1 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'Attestation1'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (1) 'Attestation2'
+	o1, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'Attestation1'
+	read, err = ssz.DecodeField(&a.Attestation1, io.LimitReader(src, int64(int(o1-o0))), int(o1-o0))
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Attestation2'
+	read, err = ssz.DecodeField(&a.Attestation2, io.LimitReader(src, int64(int(uint64(limit)-o1))), int(uint64(limit)-o1))
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the AttesterSlashing object
@@ -2661,7 +3059,6 @@ func (b *BeaconBlock) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o4 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -2702,21 +3099,61 @@ func (b *BeaconBlock) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconBlock from an io.Reader
-func (b *BeaconBlock) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconBlock) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o4 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'Slot'
+	read, err = ssz.DecodeValue[uint64](&b.Slot, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'ProposerIndex'
+	read, err = ssz.DecodeValue[uint64](&b.ProposerIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'ParentRoot'
+	read, b.ParentRoot, err = ssz.DecodeBytes(b.ParentRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'StateRoot'
+	read, b.StateRoot, err = ssz.DecodeBytes(b.StateRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (4) 'Body'
+	o4, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'Body'
+	read, err = ssz.DecodeField(&b.Body, io.LimitReader(src, int64(int(uint64(limit)-o4))), int(uint64(limit)-o4))
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconBlock object
@@ -2820,7 +3257,6 @@ func (s *SignedBeaconBlock) UnmarshalSSZTail(buf []byte) (rest []byte, err error
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -2852,21 +3288,40 @@ func (s *SignedBeaconBlock) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the SignedBeaconBlock from an io.Reader
-func (s *SignedBeaconBlock) Decode(src io.Reader, limit int) (int, error) {
+func (s *SignedBeaconBlock) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := s.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'Block'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Signature'
+	read, s.Signature, err = ssz.DecodeBytes(s.Signature, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'Block'
+	read, err = ssz.DecodeField(&s.Block, io.LimitReader(src, int64(int(uint64(limit)-o0))), int(uint64(limit)-o0))
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the SignedBeaconBlock object
@@ -3006,21 +3461,66 @@ func (t *Transfer) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Transfer from an io.Reader
-func (t *Transfer) Decode(src io.Reader, limit int) (int, error) {
+func (t *Transfer) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := t.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = t.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Sender'
+	read, err = ssz.DecodeValue[uint64](&t.Sender, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Recipient'
+	read, err = ssz.DecodeValue[uint64](&t.Recipient, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Amount'
+	read, err = ssz.DecodeValue[uint64](&t.Amount, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'Fee'
+	read, err = ssz.DecodeValue[uint64](&t.Fee, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'Slot'
+	read, err = ssz.DecodeValue[uint64](&t.Slot, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'Pubkey'
+	read, t.Pubkey, err = ssz.DecodeBytes(t.Pubkey, src, 48)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'Signature'
+	read, t.Signature, err = ssz.DecodeBytes(t.Signature, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Transfer object
@@ -3331,7 +3831,6 @@ func (b *BeaconState) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o7, o9, o11, o12, o15, o16 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -3485,21 +3984,236 @@ func (b *BeaconState) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconState from an io.Reader
-func (b *BeaconState) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconState) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o7, o9, o11, o12, o15, o16 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'GenesisTime'
+	read, err = ssz.DecodeValue[uint64](&b.GenesisTime, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'GenesisValidatorsRoot'
+	read, b.GenesisValidatorsRoot, err = ssz.DecodeBytes(b.GenesisValidatorsRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Slot'
+	read, err = ssz.DecodeValue[uint64](&b.Slot, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'Fork'
+	read, err = ssz.DecodeField(&b.Fork, src, b.Fork.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LatestBlockHeader'
+	read, err = ssz.DecodeField(&b.LatestBlockHeader, src, b.LatestBlockHeader.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'BlockRoots'
+	b.BlockRoots = make([][]byte, rootsSize)
+	for ii := uint64(0); ii < rootsSize; ii++ {
+		read, b.BlockRoots[ii], err = ssz.DecodeBytes(b.BlockRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (6) 'StateRoots'
+	b.StateRoots = make([][]byte, rootsSize)
+	for ii := uint64(0); ii < rootsSize; ii++ {
+		read, b.StateRoots[ii], err = ssz.DecodeBytes(b.StateRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Offset (7) 'HistoricalRoots'
+	o7, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'Eth1Data'
+	read, err = ssz.DecodeField(&b.Eth1Data, src, b.Eth1Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (9) 'Eth1DataVotes'
+	o9, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'Eth1DepositIndex'
+	read, err = ssz.DecodeValue[uint64](&b.Eth1DepositIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (11) 'Validators'
+	o11, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (12) 'Balances'
+	o12, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'RandaoMixes'
+	b.RandaoMixes = make([][]byte, randaoMixes)
+	for ii := uint64(0); ii < randaoMixes; ii++ {
+		read, b.RandaoMixes[ii], err = ssz.DecodeBytes(b.RandaoMixes[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (14) 'Slashings'
+	b.Slashings = ssz.Extend(b.Slashings, slashings)
+	for ii := uint64(0); ii < slashings; ii++ {
+		read, err = ssz.DecodeValue[uint64](&b.Slashings[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Offset (15) 'PreviousEpochAttestations'
+	o15, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (16) 'CurrentEpochAttestations'
+	o16, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (17) 'JustificationBits'
+	read, b.JustificationBits, err = ssz.DecodeBytes(b.JustificationBits, src, 1)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (18) 'PreviousJustifiedCheckpoint'
+	read, err = ssz.DecodeField(&b.PreviousJustifiedCheckpoint, src, b.PreviousJustifiedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (19) 'CurrentJustifiedCheckpoint'
+	read, err = ssz.DecodeField(&b.CurrentJustifiedCheckpoint, src, b.CurrentJustifiedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (20) 'FinalizedCheckpoint'
+	read, err = ssz.DecodeField(&b.FinalizedCheckpoint, src, b.FinalizedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'HistoricalRoots'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.HistoricalRoots, src, int(o9-o7), 32, 16777216, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, b.HistoricalRoots[ii], err = ssz.DecodeBytes(b.HistoricalRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Eth1DataVotes'
+	read, err = ssz.DecodeSliceSSZ(&b.Eth1DataVotes, src, int(o11-o9), eth1DataVotes)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'Validators'
+	read, err = ssz.DecodeSliceSSZ(&b.Validators, src, int(o12-o11), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'Balances'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.Balances, src, int(o15-o12), 8, 1099511627776, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint64](&b.Balances[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (15) 'PreviousEpochAttestations'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.PreviousEpochAttestations, src, int(o16-o15), epochAttestations)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (16) 'CurrentEpochAttestations'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.CurrentEpochAttestations, src, int(uint64(limit)-o16), epochAttestations)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconState object
@@ -3925,7 +4639,6 @@ func (b *BeaconBlockBodyPhase0) UnmarshalSSZTail(buf []byte) (rest []byte, err e
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o3, o4, o5, o6, o7 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -4005,21 +4718,110 @@ func (b *BeaconBlockBodyPhase0) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconBlockBodyPhase0 from an io.Reader
-func (b *BeaconBlockBodyPhase0) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconBlockBodyPhase0) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o3, o4, o5, o6, o7 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'RandaoReveal'
+	read, b.RandaoReveal, err = ssz.DecodeBytes(b.RandaoReveal, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Eth1Data'
+	read, err = ssz.DecodeField(&b.Eth1Data, src, b.Eth1Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Graffiti'
+	read, err = io.ReadFull(src, b.Graffiti[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (3) 'ProposerSlashings'
+	o3, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (4) 'AttesterSlashings'
+	o4, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (5) 'Attestations'
+	o5, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (6) 'Deposits'
+	o6, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (7) 'VoluntaryExits'
+	o7, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ProposerSlashings'
+	read, err = ssz.DecodeSliceSSZ(&b.ProposerSlashings, src, int(o4-o3), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'AttesterSlashings'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.AttesterSlashings, src, int(o5-o4), 2)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'Attestations'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.Attestations, src, int(o6-o5), 128)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'Deposits'
+	read, err = ssz.DecodeSliceSSZ(&b.Deposits, src, int(o7-o6), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'VoluntaryExits'
+	read, err = ssz.DecodeSliceSSZ(&b.VoluntaryExits, src, int(uint64(limit)-o7), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconBlockBodyPhase0 object
@@ -4316,7 +5118,6 @@ func (b *BeaconBlockBodyAltair) UnmarshalSSZTail(buf []byte) (rest []byte, err e
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o3, o4, o5, o6, o7 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -4401,21 +5202,117 @@ func (b *BeaconBlockBodyAltair) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconBlockBodyAltair from an io.Reader
-func (b *BeaconBlockBodyAltair) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconBlockBodyAltair) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o3, o4, o5, o6, o7 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'RandaoReveal'
+	read, b.RandaoReveal, err = ssz.DecodeBytes(b.RandaoReveal, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Eth1Data'
+	read, err = ssz.DecodeField(&b.Eth1Data, src, b.Eth1Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Graffiti'
+	read, err = io.ReadFull(src, b.Graffiti[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (3) 'ProposerSlashings'
+	o3, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (4) 'AttesterSlashings'
+	o4, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (5) 'Attestations'
+	o5, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (6) 'Deposits'
+	o6, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (7) 'VoluntaryExits'
+	o7, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'SyncAggregate'
+	read, err = ssz.DecodeField(&b.SyncAggregate, src, b.SyncAggregate.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ProposerSlashings'
+	read, err = ssz.DecodeSliceSSZ(&b.ProposerSlashings, src, int(o4-o3), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'AttesterSlashings'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.AttesterSlashings, src, int(o5-o4), 2)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'Attestations'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.Attestations, src, int(o6-o5), 128)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'Deposits'
+	read, err = ssz.DecodeSliceSSZ(&b.Deposits, src, int(o7-o6), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'VoluntaryExits'
+	read, err = ssz.DecodeSliceSSZ(&b.VoluntaryExits, src, int(uint64(limit)-o7), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconBlockBodyAltair object
@@ -4729,7 +5626,6 @@ func (b *BeaconBlockBodyBellatrix) UnmarshalSSZTail(buf []byte) (rest []byte, er
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o3, o4, o5, o6, o7, o9 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -4824,21 +5720,131 @@ func (b *BeaconBlockBodyBellatrix) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconBlockBodyBellatrix from an io.Reader
-func (b *BeaconBlockBodyBellatrix) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconBlockBodyBellatrix) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o3, o4, o5, o6, o7, o9 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'RandaoReveal'
+	read, b.RandaoReveal, err = ssz.DecodeBytes(b.RandaoReveal, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Eth1Data'
+	read, err = ssz.DecodeField(&b.Eth1Data, src, b.Eth1Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Graffiti'
+	read, err = io.ReadFull(src, b.Graffiti[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (3) 'ProposerSlashings'
+	o3, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (4) 'AttesterSlashings'
+	o4, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (5) 'Attestations'
+	o5, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (6) 'Deposits'
+	o6, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (7) 'VoluntaryExits'
+	o7, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'SyncAggregate'
+	read, err = ssz.DecodeField(&b.SyncAggregate, src, b.SyncAggregate.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (9) 'ExecutionPayload'
+	o9, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ProposerSlashings'
+	read, err = ssz.DecodeSliceSSZ(&b.ProposerSlashings, src, int(o4-o3), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'AttesterSlashings'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.AttesterSlashings, src, int(o5-o4), 2)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'Attestations'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.Attestations, src, int(o6-o5), 128)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'Deposits'
+	read, err = ssz.DecodeSliceSSZ(&b.Deposits, src, int(o7-o6), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'VoluntaryExits'
+	read, err = ssz.DecodeSliceSSZ(&b.VoluntaryExits, src, int(o9-o7), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'ExecutionPayload'
+	read, err = ssz.DecodeField(&b.ExecutionPayload, io.LimitReader(src, int64(int(uint64(limit)-o9))), int(uint64(limit)-o9))
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconBlockBodyBellatrix object
@@ -5263,7 +6269,6 @@ func (b *BeaconStateAltair) UnmarshalSSZTail(buf []byte) (rest []byte, err error
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o7, o9, o11, o12, o15, o16, o21 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -5440,21 +6445,272 @@ func (b *BeaconStateAltair) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconStateAltair from an io.Reader
-func (b *BeaconStateAltair) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconStateAltair) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o7, o9, o11, o12, o15, o16, o21 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'GenesisTime'
+	read, err = ssz.DecodeValue[uint64](&b.GenesisTime, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'GenesisValidatorsRoot'
+	read, b.GenesisValidatorsRoot, err = ssz.DecodeBytes(b.GenesisValidatorsRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Slot'
+	read, err = ssz.DecodeValue[uint64](&b.Slot, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'Fork'
+	read, err = ssz.DecodeField(&b.Fork, src, b.Fork.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LatestBlockHeader'
+	read, err = ssz.DecodeField(&b.LatestBlockHeader, src, b.LatestBlockHeader.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'BlockRoots'
+	b.BlockRoots = make([][]byte, rootsSize)
+	for ii := uint64(0); ii < rootsSize; ii++ {
+		read, b.BlockRoots[ii], err = ssz.DecodeBytes(b.BlockRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (6) 'StateRoots'
+	b.StateRoots = make([][]byte, rootsSize)
+	for ii := uint64(0); ii < rootsSize; ii++ {
+		read, b.StateRoots[ii], err = ssz.DecodeBytes(b.StateRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Offset (7) 'HistoricalRoots'
+	o7, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'Eth1Data'
+	read, err = ssz.DecodeField(&b.Eth1Data, src, b.Eth1Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (9) 'Eth1DataVotes'
+	o9, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'Eth1DepositIndex'
+	read, err = ssz.DecodeValue[uint64](&b.Eth1DepositIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (11) 'Validators'
+	o11, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (12) 'Balances'
+	o12, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'RandaoMixes'
+	b.RandaoMixes = make([][]byte, randaoMixes)
+	for ii := uint64(0); ii < randaoMixes; ii++ {
+		read, b.RandaoMixes[ii], err = ssz.DecodeBytes(b.RandaoMixes[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (14) 'Slashings'
+	b.Slashings = ssz.Extend(b.Slashings, slashings)
+	for ii := uint64(0); ii < slashings; ii++ {
+		read, err = ssz.DecodeValue[uint64](&b.Slashings[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Offset (15) 'PreviousEpochParticipation'
+	o15, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (16) 'CurrentEpochParticipation'
+	o16, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (17) 'JustificationBits'
+	read, b.JustificationBits, err = ssz.DecodeBytes(b.JustificationBits, src, 1)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (18) 'PreviousJustifiedCheckpoint'
+	read, err = ssz.DecodeField(&b.PreviousJustifiedCheckpoint, src, b.PreviousJustifiedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (19) 'CurrentJustifiedCheckpoint'
+	read, err = ssz.DecodeField(&b.CurrentJustifiedCheckpoint, src, b.CurrentJustifiedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (20) 'FinalizedCheckpoint'
+	read, err = ssz.DecodeField(&b.FinalizedCheckpoint, src, b.FinalizedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (21) 'InactivityScores'
+	o21, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (22) 'CurrentSyncCommittee'
+	read, err = ssz.DecodeField(&b.CurrentSyncCommittee, src, b.CurrentSyncCommittee.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (23) 'NextSyncCommittee'
+	read, err = ssz.DecodeField(&b.NextSyncCommittee, src, b.NextSyncCommittee.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'HistoricalRoots'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.HistoricalRoots, src, int(o9-o7), 32, 16777216, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, b.HistoricalRoots[ii], err = ssz.DecodeBytes(b.HistoricalRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Eth1DataVotes'
+	read, err = ssz.DecodeSliceSSZ(&b.Eth1DataVotes, src, int(o11-o9), eth1DataVotes)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'Validators'
+	read, err = ssz.DecodeSliceSSZ(&b.Validators, src, int(o12-o11), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'Balances'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.Balances, src, int(o15-o12), 8, 1099511627776, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint64](&b.Balances[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (15) 'PreviousEpochParticipation'
+	read, b.PreviousEpochParticipation, err = ssz.DecodeDynamicBytes(b.PreviousEpochParticipation, src, int(o16-o15), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (16) 'CurrentEpochParticipation'
+	read, b.CurrentEpochParticipation, err = ssz.DecodeDynamicBytes(b.CurrentEpochParticipation, src, int(o21-o16), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (21) 'InactivityScores'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.InactivityScores, src, int(uint64(limit)-o21), 8, 1099511627776, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint64](&b.InactivityScores[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconStateAltair object
@@ -6026,7 +7282,6 @@ func (b *BeaconStateBellatrix) UnmarshalSSZTail(buf []byte) (rest []byte, err er
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o7, o9, o11, o12, o15, o16, o21, o24 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -6213,21 +7468,286 @@ func (b *BeaconStateBellatrix) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconStateBellatrix from an io.Reader
-func (b *BeaconStateBellatrix) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconStateBellatrix) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o7, o9, o11, o12, o15, o16, o21, o24 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'GenesisTime'
+	read, err = ssz.DecodeValue[uint64](&b.GenesisTime, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'GenesisValidatorsRoot'
+	read, b.GenesisValidatorsRoot, err = ssz.DecodeBytes(b.GenesisValidatorsRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Slot'
+	read, err = ssz.DecodeValue[uint64](&b.Slot, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'Fork'
+	read, err = ssz.DecodeField(&b.Fork, src, b.Fork.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LatestBlockHeader'
+	read, err = ssz.DecodeField(&b.LatestBlockHeader, src, b.LatestBlockHeader.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'BlockRoots'
+	b.BlockRoots = make([][]byte, rootsSize)
+	for ii := uint64(0); ii < rootsSize; ii++ {
+		read, b.BlockRoots[ii], err = ssz.DecodeBytes(b.BlockRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (6) 'StateRoots'
+	b.StateRoots = make([][]byte, rootsSize)
+	for ii := uint64(0); ii < rootsSize; ii++ {
+		read, b.StateRoots[ii], err = ssz.DecodeBytes(b.StateRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Offset (7) 'HistoricalRoots'
+	o7, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'Eth1Data'
+	read, err = ssz.DecodeField(&b.Eth1Data, src, b.Eth1Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (9) 'Eth1DataVotes'
+	o9, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'Eth1DepositIndex'
+	read, err = ssz.DecodeValue[uint64](&b.Eth1DepositIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (11) 'Validators'
+	o11, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (12) 'Balances'
+	o12, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'RandaoMixes'
+	b.RandaoMixes = make([][]byte, randaoMixes)
+	for ii := uint64(0); ii < randaoMixes; ii++ {
+		read, b.RandaoMixes[ii], err = ssz.DecodeBytes(b.RandaoMixes[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (14) 'Slashings'
+	b.Slashings = ssz.Extend(b.Slashings, slashings)
+	for ii := uint64(0); ii < slashings; ii++ {
+		read, err = ssz.DecodeValue[uint64](&b.Slashings[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Offset (15) 'PreviousEpochParticipation'
+	o15, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (16) 'CurrentEpochParticipation'
+	o16, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (17) 'JustificationBits'
+	read, b.JustificationBits, err = ssz.DecodeBytes(b.JustificationBits, src, 1)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (18) 'PreviousJustifiedCheckpoint'
+	read, err = ssz.DecodeField(&b.PreviousJustifiedCheckpoint, src, b.PreviousJustifiedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (19) 'CurrentJustifiedCheckpoint'
+	read, err = ssz.DecodeField(&b.CurrentJustifiedCheckpoint, src, b.CurrentJustifiedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (20) 'FinalizedCheckpoint'
+	read, err = ssz.DecodeField(&b.FinalizedCheckpoint, src, b.FinalizedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (21) 'InactivityScores'
+	o21, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (22) 'CurrentSyncCommittee'
+	read, err = ssz.DecodeField(&b.CurrentSyncCommittee, src, b.CurrentSyncCommittee.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (23) 'NextSyncCommittee'
+	read, err = ssz.DecodeField(&b.NextSyncCommittee, src, b.NextSyncCommittee.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (24) 'LatestExecutionPayloadHeader'
+	o24, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'HistoricalRoots'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.HistoricalRoots, src, int(o9-o7), 32, 16777216, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, b.HistoricalRoots[ii], err = ssz.DecodeBytes(b.HistoricalRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Eth1DataVotes'
+	read, err = ssz.DecodeSliceSSZ(&b.Eth1DataVotes, src, int(o11-o9), eth1DataVotes)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'Validators'
+	read, err = ssz.DecodeSliceSSZ(&b.Validators, src, int(o12-o11), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'Balances'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.Balances, src, int(o15-o12), 8, 1099511627776, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint64](&b.Balances[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (15) 'PreviousEpochParticipation'
+	read, b.PreviousEpochParticipation, err = ssz.DecodeDynamicBytes(b.PreviousEpochParticipation, src, int(o16-o15), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (16) 'CurrentEpochParticipation'
+	read, b.CurrentEpochParticipation, err = ssz.DecodeDynamicBytes(b.CurrentEpochParticipation, src, int(o21-o16), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (21) 'InactivityScores'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.InactivityScores, src, int(o24-o21), 8, 1099511627776, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint64](&b.InactivityScores[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (24) 'LatestExecutionPayloadHeader'
+	read, err = ssz.DecodeField(&b.LatestExecutionPayloadHeader, io.LimitReader(src, int64(int(uint64(limit)-o24))), int(uint64(limit)-o24))
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconStateBellatrix object
@@ -6609,21 +8129,31 @@ func (s *SignedBeaconBlockHeader) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the SignedBeaconBlockHeader from an io.Reader
-func (s *SignedBeaconBlockHeader) Decode(src io.Reader, limit int) (int, error) {
+func (s *SignedBeaconBlockHeader) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := s.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Header'
+	read, err = ssz.DecodeField(&s.Header, src, s.Header.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Signature'
+	read, s.Signature, err = ssz.DecodeBytes(s.Signature, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the SignedBeaconBlockHeader object
@@ -6751,21 +8281,52 @@ func (b *BeaconBlockHeader) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconBlockHeader from an io.Reader
-func (b *BeaconBlockHeader) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconBlockHeader) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Slot'
+	read, err = ssz.DecodeValue[uint64](&b.Slot, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'ProposerIndex'
+	read, err = ssz.DecodeValue[uint64](&b.ProposerIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'ParentRoot'
+	read, b.ParentRoot, err = ssz.DecodeBytes(b.ParentRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'StateRoot'
+	read, b.StateRoot, err = ssz.DecodeBytes(b.StateRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'BodyRoot'
+	read, b.BodyRoot, err = ssz.DecodeBytes(b.BodyRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconBlockHeader object
@@ -6859,7 +8420,6 @@ func (e *ErrorResponse) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -6888,21 +8448,33 @@ func (e *ErrorResponse) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ErrorResponse from an io.Reader
-func (e *ErrorResponse) Decode(src io.Reader, limit int) (int, error) {
+func (e *ErrorResponse) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'Message'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'Message'
+	read, e.Message, err = ssz.DecodeDynamicBytes(e.Message, src, int(uint64(limit)-o0), 256)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ErrorResponse object
@@ -6989,21 +8561,16 @@ func (d *Dummy) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Dummy from an io.Reader
-func (d *Dummy) Decode(src io.Reader, limit int) (int, error) {
+func (d *Dummy) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := d.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = d.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
 
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Dummy object
@@ -7099,21 +8666,34 @@ func (s *SyncCommittee) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the SyncCommittee from an io.Reader
-func (s *SyncCommittee) Decode(src io.Reader, limit int) (int, error) {
+func (s *SyncCommittee) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := s.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'PubKeys'
+	s.PubKeys = make([][]byte, syncCommitteePubKeys)
+	for ii := uint64(0); ii < syncCommitteePubKeys; ii++ {
+		read, s.PubKeys[ii], err = ssz.DecodeBytes(s.PubKeys[ii], src, 48)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (1) 'AggregatePubKey'
+	read, err = io.ReadFull(src, s.AggregatePubKey[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the SyncCommittee object
@@ -7220,21 +8800,31 @@ func (s *SyncAggregate) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the SyncAggregate from an io.Reader
-func (s *SyncAggregate) Decode(src io.Reader, limit int) (int, error) {
+func (s *SyncAggregate) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := s.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'SyncCommiteeBits'
+	read, s.SyncCommiteeBits, err = ssz.DecodeBytes(s.SyncCommiteeBits, src, syncCommitteeBits)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'SyncCommiteeSignature'
+	read, err = io.ReadFull(src, s.SyncCommiteeSignature[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the SyncAggregate object
@@ -7371,7 +8961,6 @@ func (e *ExecutionPayload) UnmarshalSSZTail(buf []byte) (rest []byte, err error)
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o10, o13 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -7451,21 +9040,138 @@ func (e *ExecutionPayload) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ExecutionPayload from an io.Reader
-func (e *ExecutionPayload) Decode(src io.Reader, limit int) (int, error) {
+func (e *ExecutionPayload) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o10, o13 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'ParentHash'
+	read, err = io.ReadFull(src, e.ParentHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'FeeRecipient'
+	read, err = io.ReadFull(src, e.FeeRecipient[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'StateRoot'
+	read, err = io.ReadFull(src, e.StateRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ReceiptsRoot'
+	read, err = io.ReadFull(src, e.ReceiptsRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LogsBloom'
+	read, err = io.ReadFull(src, e.LogsBloom[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'PrevRandao'
+	read, err = io.ReadFull(src, e.PrevRandao[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'BlockNumber'
+	read, err = ssz.DecodeValue[uint64](&e.BlockNumber, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'GasLimit'
+	read, err = ssz.DecodeValue[uint64](&e.GasLimit, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'GasUsed'
+	read, err = ssz.DecodeValue[uint64](&e.GasUsed, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Timestamp'
+	read, err = ssz.DecodeValue[uint64](&e.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (10) 'ExtraData'
+	o10, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'BaseFeePerGas'
+	read, err = io.ReadFull(src, e.BaseFeePerGas[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'BlockHash'
+	read, err = io.ReadFull(src, e.BlockHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (13) 'Transactions'
+	o13, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'ExtraData'
+	read, e.ExtraData, err = ssz.DecodeDynamicBytes(e.ExtraData, src, int(o13-o10), 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'Transactions'
+	read, err = ssz.DecodeDynamicSliceWithCallback(&e.Transactions, src, int(uint64(limit)-o13), 1048576, func(indx uint64, src io.Reader, elementLimit int) (n int, err error) {
+		read, e.Transactions[indx], err = ssz.DecodeDynamicBytes(e.Transactions[indx], src, elementLimit, 1073741824)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ExecutionPayload object
@@ -7688,7 +9394,6 @@ func (e *ExecutionPayloadHeader) UnmarshalSSZTail(buf []byte) (rest []byte, err 
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o10 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -7756,21 +9461,124 @@ func (e *ExecutionPayloadHeader) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ExecutionPayloadHeader from an io.Reader
-func (e *ExecutionPayloadHeader) Decode(src io.Reader, limit int) (int, error) {
+func (e *ExecutionPayloadHeader) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o10 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'ParentHash'
+	read, e.ParentHash, err = ssz.DecodeBytes(e.ParentHash, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'FeeRecipient'
+	read, e.FeeRecipient, err = ssz.DecodeBytes(e.FeeRecipient, src, 20)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'StateRoot'
+	read, e.StateRoot, err = ssz.DecodeBytes(e.StateRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ReceiptsRoot'
+	read, e.ReceiptsRoot, err = ssz.DecodeBytes(e.ReceiptsRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LogsBloom'
+	read, e.LogsBloom, err = ssz.DecodeBytes(e.LogsBloom, src, 256)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'PrevRandao'
+	read, e.PrevRandao, err = ssz.DecodeBytes(e.PrevRandao, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'BlockNumber'
+	read, err = ssz.DecodeValue[uint64](&e.BlockNumber, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'GasLimit'
+	read, err = ssz.DecodeValue[uint64](&e.GasLimit, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'GasUsed'
+	read, err = ssz.DecodeValue[uint64](&e.GasUsed, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Timestamp'
+	read, err = ssz.DecodeValue[uint64](&e.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (10) 'ExtraData'
+	o10, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'BaseFeePerGas'
+	read, e.BaseFeePerGas, err = ssz.DecodeBytes(e.BaseFeePerGas, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'BlockHash'
+	read, e.BlockHash, err = ssz.DecodeBytes(e.BlockHash, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'TransactionsRoot'
+	read, e.TransactionsRoot, err = ssz.DecodeBytes(e.TransactionsRoot, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'ExtraData'
+	read, e.ExtraData, err = ssz.DecodeDynamicBytes(e.ExtraData, src, int(uint64(limit)-o10), 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ExecutionPayloadHeader object
@@ -7941,7 +9749,6 @@ func (e *ExecutionPayloadTransactions) UnmarshalSSZTail(buf []byte) (rest []byte
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -7975,21 +9782,40 @@ func (e *ExecutionPayloadTransactions) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ExecutionPayloadTransactions from an io.Reader
-func (e *ExecutionPayloadTransactions) Decode(src io.Reader, limit int) (int, error) {
+func (e *ExecutionPayloadTransactions) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'Transactions'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'Transactions'
+	read, err = ssz.DecodeDynamicSliceWithCallback(&e.Transactions, src, int(uint64(limit)-o0), 1048576, func(indx uint64, src io.Reader, elementLimit int) (n int, err error) {
+		read, e.Transactions[indx], err = ssz.DecodeDynamicBytes(e.Transactions[indx], src, elementLimit, 1073741824)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ExecutionPayloadTransactions object
@@ -8164,7 +9990,6 @@ func (e *ExecutionPayloadCapella) UnmarshalSSZTail(buf []byte) (rest []byte, err
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o10, o13, o14 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -8254,21 +10079,152 @@ func (e *ExecutionPayloadCapella) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ExecutionPayloadCapella from an io.Reader
-func (e *ExecutionPayloadCapella) Decode(src io.Reader, limit int) (int, error) {
+func (e *ExecutionPayloadCapella) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o10, o13, o14 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'ParentHash'
+	read, err = io.ReadFull(src, e.ParentHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'FeeRecipient'
+	read, err = io.ReadFull(src, e.FeeRecipient[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'StateRoot'
+	read, err = io.ReadFull(src, e.StateRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ReceiptsRoot'
+	read, err = io.ReadFull(src, e.ReceiptsRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LogsBloom'
+	read, err = io.ReadFull(src, e.LogsBloom[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'PrevRandao'
+	read, err = io.ReadFull(src, e.PrevRandao[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'BlockNumber'
+	read, err = ssz.DecodeValue[uint64](&e.BlockNumber, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'GasLimit'
+	read, err = ssz.DecodeValue[uint64](&e.GasLimit, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'GasUsed'
+	read, err = ssz.DecodeValue[uint64](&e.GasUsed, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Timestamp'
+	read, err = ssz.DecodeValue[uint64](&e.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (10) 'ExtraData'
+	o10, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'BaseFeePerGas'
+	read, err = io.ReadFull(src, e.BaseFeePerGas[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'BlockHash'
+	read, err = io.ReadFull(src, e.BlockHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (13) 'Transactions'
+	o13, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (14) 'Withdrawals'
+	o14, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'ExtraData'
+	read, e.ExtraData, err = ssz.DecodeDynamicBytes(e.ExtraData, src, int(o13-o10), 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'Transactions'
+	read, err = ssz.DecodeDynamicSliceWithCallback(&e.Transactions, src, int(o14-o13), 1048576, func(indx uint64, src io.Reader, elementLimit int) (n int, err error) {
+		read, e.Transactions[indx], err = ssz.DecodeDynamicBytes(e.Transactions[indx], src, elementLimit, 1073741824)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (14) 'Withdrawals'
+	read, err = ssz.DecodeSliceSSZ(&e.Withdrawals, src, int(uint64(limit)-o14), withdrawals)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ExecutionPayloadCapella object
@@ -8477,7 +10433,6 @@ func (e *ExecutionPayloadHeaderCapella) UnmarshalSSZTail(buf []byte) (rest []byt
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o10 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -8548,21 +10503,131 @@ func (e *ExecutionPayloadHeaderCapella) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ExecutionPayloadHeaderCapella from an io.Reader
-func (e *ExecutionPayloadHeaderCapella) Decode(src io.Reader, limit int) (int, error) {
+func (e *ExecutionPayloadHeaderCapella) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o10 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'ParentHash'
+	read, err = io.ReadFull(src, e.ParentHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'FeeRecipient'
+	read, err = io.ReadFull(src, e.FeeRecipient[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'StateRoot'
+	read, err = io.ReadFull(src, e.StateRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ReceiptsRoot'
+	read, err = io.ReadFull(src, e.ReceiptsRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LogsBloom'
+	read, err = io.ReadFull(src, e.LogsBloom[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'PrevRandao'
+	read, err = io.ReadFull(src, e.PrevRandao[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'BlockNumber'
+	read, err = ssz.DecodeValue[uint64](&e.BlockNumber, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'GasLimit'
+	read, err = ssz.DecodeValue[uint64](&e.GasLimit, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'GasUsed'
+	read, err = ssz.DecodeValue[uint64](&e.GasUsed, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Timestamp'
+	read, err = ssz.DecodeValue[uint64](&e.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (10) 'ExtraData'
+	o10, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'BaseFeePerGas'
+	read, err = io.ReadFull(src, e.BaseFeePerGas[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'BlockHash'
+	read, err = io.ReadFull(src, e.BlockHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'TransactionsRoot'
+	read, err = io.ReadFull(src, e.TransactionsRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (14) 'WithdrawalRoot'
+	read, err = io.ReadFull(src, e.WithdrawalRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'ExtraData'
+	read, e.ExtraData, err = ssz.DecodeDynamicBytes(e.ExtraData, src, int(uint64(limit)-o10), 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ExecutionPayloadHeaderCapella object
@@ -8709,21 +10774,38 @@ func (b *BLSToExecutionChange) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BLSToExecutionChange from an io.Reader
-func (b *BLSToExecutionChange) Decode(src io.Reader, limit int) (int, error) {
+func (b *BLSToExecutionChange) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'ValidatorIndex'
+	read, err = ssz.DecodeValue[uint64](&b.ValidatorIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'FromBLSPubKey'
+	read, err = io.ReadFull(src, b.FromBLSPubKey[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'ToExecutionAddress'
+	read, err = io.ReadFull(src, b.ToExecutionAddress[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BLSToExecutionChange object
@@ -8815,21 +10897,31 @@ func (h *HistoricalSummary) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the HistoricalSummary from an io.Reader
-func (h *HistoricalSummary) Decode(src io.Reader, limit int) (int, error) {
+func (h *HistoricalSummary) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := h.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = h.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'BlockSummaryRoot'
+	read, err = io.ReadFull(src, h.BlockSummaryRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'StateSummaryRoot'
+	read, err = io.ReadFull(src, h.StateSummaryRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the HistoricalSummary object
@@ -8925,21 +11017,31 @@ func (s *SignedBLSToExecutionChange) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the SignedBLSToExecutionChange from an io.Reader
-func (s *SignedBLSToExecutionChange) Decode(src io.Reader, limit int) (int, error) {
+func (s *SignedBLSToExecutionChange) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := s.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Message'
+	read, err = ssz.DecodeField(&s.Message, src, s.Message.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Signature'
+	read, err = io.ReadFull(src, s.Signature[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the SignedBLSToExecutionChange object
@@ -9045,21 +11147,45 @@ func (w *Withdrawal) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Withdrawal from an io.Reader
-func (w *Withdrawal) Decode(src io.Reader, limit int) (int, error) {
+func (w *Withdrawal) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := w.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = w.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Index'
+	read, err = ssz.DecodeValue[uint64](&w.Index, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'ValidatorIndex'
+	read, err = ssz.DecodeValue[uint64](&w.ValidatorIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Address'
+	read, err = io.ReadFull(src, w.Address[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'Amount'
+	read, err = ssz.DecodeValue[uint64](&w.Amount, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Withdrawal object
@@ -9382,7 +11508,6 @@ func (b *BeaconStateCapella) UnmarshalSSZTail(buf []byte) (rest []byte, err erro
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o7, o9, o11, o12, o15, o16, o21, o24, o27 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -9585,21 +11710,314 @@ func (b *BeaconStateCapella) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconStateCapella from an io.Reader
-func (b *BeaconStateCapella) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconStateCapella) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o7, o9, o11, o12, o15, o16, o21, o24, o27 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'GenesisTime'
+	read, err = ssz.DecodeValue[uint64](&b.GenesisTime, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'GenesisValidatorsRoot'
+	read, err = io.ReadFull(src, b.GenesisValidatorsRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Slot'
+	read, err = ssz.DecodeValue[uint64](&b.Slot, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'Fork'
+	read, err = ssz.DecodeField(&b.Fork, src, b.Fork.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LatestBlockHeader'
+	read, err = ssz.DecodeField(&b.LatestBlockHeader, src, b.LatestBlockHeader.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'BlockRoots'
+	b.BlockRoots = make([][]byte, rootsSize)
+	for ii := uint64(0); ii < rootsSize; ii++ {
+		read, b.BlockRoots[ii], err = ssz.DecodeBytes(b.BlockRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (6) 'StateRoots'
+	b.StateRoots = make([][]byte, rootsSize)
+	for ii := uint64(0); ii < rootsSize; ii++ {
+		read, b.StateRoots[ii], err = ssz.DecodeBytes(b.StateRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Offset (7) 'HistoricalRoots'
+	o7, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'Eth1Data'
+	read, err = ssz.DecodeField(&b.Eth1Data, src, b.Eth1Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (9) 'Eth1DataVotes'
+	o9, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'Eth1DepositIndex'
+	read, err = ssz.DecodeValue[uint64](&b.Eth1DepositIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (11) 'Validators'
+	o11, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (12) 'Balances'
+	o12, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'RandaoMixes'
+	b.RandaoMixes = make([][]byte, randaoMixes)
+	for ii := uint64(0); ii < randaoMixes; ii++ {
+		read, b.RandaoMixes[ii], err = ssz.DecodeBytes(b.RandaoMixes[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (14) 'Slashings'
+	b.Slashings = ssz.Extend(b.Slashings, slashings)
+	for ii := uint64(0); ii < slashings; ii++ {
+		read, err = ssz.DecodeValue[uint64](&b.Slashings[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Offset (15) 'PreviousEpochParticipation'
+	o15, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (16) 'CurrentEpochParticipation'
+	o16, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (17) 'JustificationBits'
+	read, err = io.ReadFull(src, b.JustificationBits[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (18) 'PreviousJustifiedCheckpoint'
+	read, err = ssz.DecodeField(&b.PreviousJustifiedCheckpoint, src, b.PreviousJustifiedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (19) 'CurrentJustifiedCheckpoint'
+	read, err = ssz.DecodeField(&b.CurrentJustifiedCheckpoint, src, b.CurrentJustifiedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (20) 'FinalizedCheckpoint'
+	read, err = ssz.DecodeField(&b.FinalizedCheckpoint, src, b.FinalizedCheckpoint.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (21) 'InactivityScores'
+	o21, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (22) 'CurrentSyncCommittee'
+	read, err = ssz.DecodeField(&b.CurrentSyncCommittee, src, b.CurrentSyncCommittee.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (23) 'NextSyncCommittee'
+	read, err = ssz.DecodeField(&b.NextSyncCommittee, src, b.NextSyncCommittee.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (24) 'LatestExecutionPayloadHeader'
+	o24, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (25) 'NextWithdrawalIndex'
+	read, err = ssz.DecodeValue[uint64](&b.NextWithdrawalIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (26) 'NextWithdrawalValidatorIndex'
+	read, err = ssz.DecodeValue[uint64](&b.NextWithdrawalValidatorIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (27) 'HistoricalSummaries'
+	o27, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'HistoricalRoots'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.HistoricalRoots, src, int(o9-o7), 32, 16777216, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, b.HistoricalRoots[ii], err = ssz.DecodeBytes(b.HistoricalRoots[ii], src, 32)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Eth1DataVotes'
+	read, err = ssz.DecodeSliceSSZ(&b.Eth1DataVotes, src, int(o11-o9), eth1DataVotes)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'Validators'
+	read, err = ssz.DecodeSliceSSZ(&b.Validators, src, int(o12-o11), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'Balances'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.Balances, src, int(o15-o12), 8, 1099511627776, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint64](&b.Balances[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (15) 'PreviousEpochParticipation'
+	read, b.PreviousEpochParticipation, err = ssz.DecodeDynamicBytes(b.PreviousEpochParticipation, src, int(o16-o15), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (16) 'CurrentEpochParticipation'
+	read, b.CurrentEpochParticipation, err = ssz.DecodeDynamicBytes(b.CurrentEpochParticipation, src, int(o21-o16), 1099511627776)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (21) 'InactivityScores'
+	read, err = ssz.DecodeSliceWithIndexCallback(&b.InactivityScores, src, int(o24-o21), 8, 1099511627776, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = ssz.DecodeValue[uint64](&b.InactivityScores[ii], src)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (24) 'LatestExecutionPayloadHeader'
+	read, err = ssz.DecodeField(&b.LatestExecutionPayloadHeader, io.LimitReader(src, int64(int(o27-o24))), int(o27-o24))
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (27) 'HistoricalSummaries'
+	read, err = ssz.DecodeSliceSSZ(&b.HistoricalSummaries, src, int(uint64(limit)-o27), 16777216)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconStateCapella object
@@ -9976,7 +12394,6 @@ func (s *SignedBeaconBlockCapella) UnmarshalSSZTail(buf []byte) (rest []byte, er
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -10008,21 +12425,40 @@ func (s *SignedBeaconBlockCapella) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the SignedBeaconBlockCapella from an io.Reader
-func (s *SignedBeaconBlockCapella) Decode(src io.Reader, limit int) (int, error) {
+func (s *SignedBeaconBlockCapella) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := s.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = s.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'Block'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Signature'
+	read, s.Signature, err = ssz.DecodeBytes(s.Signature, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'Block'
+	read, err = ssz.DecodeField(&s.Block, io.LimitReader(src, int64(int(uint64(limit)-o0))), int(uint64(limit)-o0))
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the SignedBeaconBlockCapella object
@@ -10118,7 +12554,6 @@ func (b *BeaconBlockCapella) UnmarshalSSZTail(buf []byte) (rest []byte, err erro
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o4 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -10159,21 +12594,61 @@ func (b *BeaconBlockCapella) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconBlockCapella from an io.Reader
-func (b *BeaconBlockCapella) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconBlockCapella) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o4 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'Slot'
+	read, err = ssz.DecodeValue[uint64](&b.Slot, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'ProposerIndex'
+	read, err = ssz.DecodeValue[uint64](&b.ProposerIndex, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'ParentRoot'
+	read, err = io.ReadFull(src, b.ParentRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'StateRoot'
+	read, err = io.ReadFull(src, b.StateRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (4) 'Body'
+	o4, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'Body'
+	read, err = ssz.DecodeField(&b.Body, io.LimitReader(src, int64(int(uint64(limit)-o4))), int(uint64(limit)-o4))
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconBlockCapella object
@@ -10401,7 +12876,6 @@ func (b *BeaconBlockBodyCapella) UnmarshalSSZTail(buf []byte) (rest []byte, err 
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o3, o4, o5, o6, o7, o9, o10 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -10506,21 +12980,145 @@ func (b *BeaconBlockBodyCapella) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BeaconBlockBodyCapella from an io.Reader
-func (b *BeaconBlockBodyCapella) Decode(src io.Reader, limit int) (int, error) {
+func (b *BeaconBlockBodyCapella) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o3, o4, o5, o6, o7, o9, o10 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'RandaoReveal'
+	read, b.RandaoReveal, err = ssz.DecodeBytes(b.RandaoReveal, src, 96)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Eth1Data'
+	read, err = ssz.DecodeField(&b.Eth1Data, src, b.Eth1Data.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'Graffiti'
+	read, err = io.ReadFull(src, b.Graffiti[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (3) 'ProposerSlashings'
+	o3, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (4) 'AttesterSlashings'
+	o4, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (5) 'Attestations'
+	o5, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (6) 'Deposits'
+	o6, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (7) 'VoluntaryExits'
+	o7, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'SyncAggregate'
+	read, err = ssz.DecodeField(&b.SyncAggregate, src, b.SyncAggregate.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (9) 'ExecutionPayload'
+	o9, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (10) 'BlsToExecutionChanges'
+	o10, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ProposerSlashings'
+	read, err = ssz.DecodeSliceSSZ(&b.ProposerSlashings, src, int(o4-o3), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'AttesterSlashings'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.AttesterSlashings, src, int(o5-o4), 2)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'Attestations'
+	read, err = ssz.DecodeDynamicSliceSSZ(&b.Attestations, src, int(o6-o5), 128)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'Deposits'
+	read, err = ssz.DecodeSliceSSZ(&b.Deposits, src, int(o7-o6), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'VoluntaryExits'
+	read, err = ssz.DecodeSliceSSZ(&b.VoluntaryExits, src, int(o9-o7), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'ExecutionPayload'
+	read, err = ssz.DecodeField(&b.ExecutionPayload, io.LimitReader(src, int64(int(o10-o9))), int(o10-o9))
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'BlsToExecutionChanges'
+	read, err = ssz.DecodeSliceSSZ(&b.BlsToExecutionChanges, src, int(uint64(limit)-o10), 16)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BeaconBlockBodyCapella object
@@ -10829,7 +13427,6 @@ func (e *ExecutionPayloadDeneb) UnmarshalSSZTail(buf []byte) (rest []byte, err e
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o10, o13, o14 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -10925,21 +13522,166 @@ func (e *ExecutionPayloadDeneb) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ExecutionPayloadDeneb from an io.Reader
-func (e *ExecutionPayloadDeneb) Decode(src io.Reader, limit int) (int, error) {
+func (e *ExecutionPayloadDeneb) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o10, o13, o14 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'ParentHash'
+	read, err = io.ReadFull(src, e.ParentHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'FeeRecipient'
+	read, err = io.ReadFull(src, e.FeeRecipient[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'StateRoot'
+	read, err = io.ReadFull(src, e.StateRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ReceiptsRoot'
+	read, err = io.ReadFull(src, e.ReceiptsRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LogsBloom'
+	read, err = io.ReadFull(src, e.LogsBloom[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'PrevRandao'
+	read, err = io.ReadFull(src, e.PrevRandao[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'BlockNumber'
+	read, err = ssz.DecodeValue[uint64](&e.BlockNumber, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'GasLimit'
+	read, err = ssz.DecodeValue[uint64](&e.GasLimit, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'GasUsed'
+	read, err = ssz.DecodeValue[uint64](&e.GasUsed, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Timestamp'
+	read, err = ssz.DecodeValue[uint64](&e.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (10) 'ExtraData'
+	o10, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'BaseFeePerGas'
+	read, err = io.ReadFull(src, e.BaseFeePerGas[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'BlockHash'
+	read, err = io.ReadFull(src, e.BlockHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (13) 'Transactions'
+	o13, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (14) 'Withdrawals'
+	o14, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (15) 'BlobGasUsed'
+	read, err = ssz.DecodeValue[uint64](&e.BlobGasUsed, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (16) 'ExcessBlobGas'
+	read, err = ssz.DecodeValue[uint64](&e.ExcessBlobGas, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'ExtraData'
+	read, e.ExtraData, err = ssz.DecodeDynamicBytes(e.ExtraData, src, int(o13-o10), 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'Transactions'
+	read, err = ssz.DecodeDynamicSliceWithCallback(&e.Transactions, src, int(o14-o13), 1048576, func(indx uint64, src io.Reader, elementLimit int) (n int, err error) {
+		read, e.Transactions[indx], err = ssz.DecodeDynamicBytes(e.Transactions[indx], src, elementLimit, 1073741824)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (14) 'Withdrawals'
+	read, err = ssz.DecodeSliceSSZ(&e.Withdrawals, src, int(uint64(limit)-o14), withdrawals)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ExecutionPayloadDeneb object
@@ -11160,7 +13902,6 @@ func (e *ExecutionPayloadHeaderDeneb) UnmarshalSSZTail(buf []byte) (rest []byte,
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o10 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -11237,21 +13978,145 @@ func (e *ExecutionPayloadHeaderDeneb) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ExecutionPayloadHeaderDeneb from an io.Reader
-func (e *ExecutionPayloadHeaderDeneb) Decode(src io.Reader, limit int) (int, error) {
+func (e *ExecutionPayloadHeaderDeneb) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := e.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = e.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o10 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'ParentHash'
+	read, err = io.ReadFull(src, e.ParentHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'FeeRecipient'
+	read, err = io.ReadFull(src, e.FeeRecipient[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'StateRoot'
+	read, err = io.ReadFull(src, e.StateRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (3) 'ReceiptsRoot'
+	read, err = io.ReadFull(src, e.ReceiptsRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (4) 'LogsBloom'
+	read, err = io.ReadFull(src, e.LogsBloom[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (5) 'PrevRandao'
+	read, err = io.ReadFull(src, e.PrevRandao[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (6) 'BlockNumber'
+	read, err = ssz.DecodeValue[uint64](&e.BlockNumber, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (7) 'GasLimit'
+	read, err = ssz.DecodeValue[uint64](&e.GasLimit, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (8) 'GasUsed'
+	read, err = ssz.DecodeValue[uint64](&e.GasUsed, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (9) 'Timestamp'
+	read, err = ssz.DecodeValue[uint64](&e.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (10) 'ExtraData'
+	o10, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (11) 'BaseFeePerGas'
+	read, err = io.ReadFull(src, e.BaseFeePerGas[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (12) 'BlockHash'
+	read, err = io.ReadFull(src, e.BlockHash[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (13) 'TransactionsRoot'
+	read, err = io.ReadFull(src, e.TransactionsRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (14) 'WithdrawalRoot'
+	read, err = io.ReadFull(src, e.WithdrawalRoot[:])
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (15) 'BlobGasUsed'
+	read, err = ssz.DecodeValue[uint64](&e.BlobGasUsed, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (16) 'ExcessBlobGas'
+	read, err = ssz.DecodeValue[uint64](&e.ExcessBlobGas, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (10) 'ExtraData'
+	read, e.ExtraData, err = ssz.DecodeDynamicBytes(e.ExtraData, src, int(uint64(limit)-o10), 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ExecutionPayloadHeaderDeneb object

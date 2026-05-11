@@ -70,21 +70,38 @@ func (m *Metadata) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Metadata from an io.Reader
-func (m *Metadata) Decode(src io.Reader, limit int) (int, error) {
+func (m *Metadata) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := m.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = m.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Version'
+	read, err = ssz.DecodeValue[uint8](&m.Version, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'CodeHash'
+	read, m.CodeHash, err = ssz.DecodeBytes(m.CodeHash, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (2) 'CodeLength'
+	read, err = ssz.DecodeValue[uint16](&m.CodeLength, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Metadata object
@@ -184,21 +201,31 @@ func (c *Chunk) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Chunk from an io.Reader
-func (c *Chunk) Decode(src io.Reader, limit int) (int, error) {
+func (c *Chunk) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := c.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = c.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'FIO'
+	read, err = ssz.DecodeValue[uint8](&c.FIO, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Code'
+	read, c.Code, err = ssz.DecodeBytes(c.Code, src, 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Chunk object
@@ -287,7 +314,6 @@ func (c *CodeTrieSmall) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o1 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -321,21 +347,40 @@ func (c *CodeTrieSmall) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the CodeTrieSmall from an io.Reader
-func (c *CodeTrieSmall) Decode(src io.Reader, limit int) (int, error) {
+func (c *CodeTrieSmall) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := c.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = c.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o1 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'Metadata'
+	read, err = ssz.DecodeField(&c.Metadata, src, c.Metadata.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (1) 'Chunks'
+	o1, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Chunks'
+	read, err = ssz.DecodeSliceSSZ(&c.Chunks, src, int(uint64(limit)-o1), 4)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the CodeTrieSmall object
@@ -442,7 +487,6 @@ func (c *CodeTrieBig) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o1 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -476,21 +520,40 @@ func (c *CodeTrieBig) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the CodeTrieBig from an io.Reader
-func (c *CodeTrieBig) Decode(src io.Reader, limit int) (int, error) {
+func (c *CodeTrieBig) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := c.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = c.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o1 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Field (0) 'Metadata'
+	read, err = ssz.DecodeField(&c.Metadata, src, c.Metadata.SizeSSZ())
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (1) 'Chunks'
+	o1, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Chunks'
+	read, err = ssz.DecodeSliceSSZ(&c.Chunks, src, int(uint64(limit)-o1), 1024)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the CodeTrieBig object

@@ -50,7 +50,6 @@ func (c *Case7) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -82,21 +81,41 @@ func (c *Case7) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Case7 from an io.Reader
-func (c *Case7) Decode(src io.Reader, limit int) (int, error) {
+func (c *Case7) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := c.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = c.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'BlobKzgs'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'BlobKzgs'
+	read, err = ssz.DecodeSliceWithIndexCallback(&c.BlobKzgs, src, int(uint64(limit)-o0), 48, 16, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, c.BlobKzgs[ii], err = ssz.DecodeBytes(c.BlobKzgs[ii], src, 48)
+		n += read
+		if err != nil {
+			return
+		}
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Case7 object

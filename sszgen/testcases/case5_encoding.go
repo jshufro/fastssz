@@ -105,21 +105,47 @@ func (c *Case5A) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Case5A from an io.Reader
-func (c *Case5A) Decode(src io.Reader, limit int) (int, error) {
+func (c *Case5A) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := c.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = c.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'A'
+	c.A = make([][]byte, 2)
+	for ii := uint64(0); ii < 2; ii++ {
+		read, c.A[ii], err = ssz.DecodeBytes(c.A[ii], src, 2)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (1) 'B'
+	c.B = make([]Case5Bytes, 2)
+	for ii := uint64(0); ii < 2; ii++ {
+		read, c.B[ii], err = ssz.DecodeBytes(c.B[ii], src, 2)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	// Field (2) 'C'
+	c.C = make([][]byte, 2)
+	for ii := uint64(0); ii < 2; ii++ {
+		read, c.C[ii], err = ssz.DecodeBytes(c.C[ii], src, 2)
+		n += read
+		if err != nil {
+			return
+		}
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Case5A object

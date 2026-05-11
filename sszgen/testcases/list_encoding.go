@@ -58,21 +58,24 @@ func (b *BytesWrapper) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the BytesWrapper from an io.Reader
-func (b *BytesWrapper) Decode(src io.Reader, limit int) (int, error) {
+func (b *BytesWrapper) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := b.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = b.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Bytes'
+	read, b.Bytes, err = ssz.DecodeBytes(b.Bytes, src, 48)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the BytesWrapper object
@@ -150,7 +153,6 @@ func (l *ListC) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -184,21 +186,42 @@ func (l *ListC) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ListC from an io.Reader
-func (l *ListC) Decode(src io.Reader, limit int) (int, error) {
+func (l *ListC) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := l.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = l.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'Elems'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'Elems'
+	read, err = ssz.DecodeSliceWithIndexCallback(&l.Elems, src, int(uint64(limit)-o0), 48, 32, func(ii uint64, src io.Reader, elementLimit int) (n int, err error) {
+		var read int
+		read, err = l.Elems[ii].Decode(io.LimitReader(src, int64(elementLimit)), elementLimit)
+		n += read
+		if err != nil {
+			return
+		}
+
+		return
+	})
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ListC object
@@ -289,7 +312,6 @@ func (l *ListP) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -318,21 +340,33 @@ func (l *ListP) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the ListP from an io.Reader
-func (l *ListP) Decode(src io.Reader, limit int) (int, error) {
+func (l *ListP) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := l.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = l.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'Elems'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'Elems'
+	read, err = ssz.DecodeSliceSSZ(&l.Elems, src, int(uint64(limit)-o0), 32)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the ListP object

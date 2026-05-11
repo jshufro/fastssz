@@ -55,7 +55,6 @@ func (i *Issue165) UnmarshalSSZTail(buf []byte) (rest []byte, err error) {
 	if size < fixedSize {
 		return nil, ssz.ErrSize
 	}
-
 	tail := buf
 	var o0, o1 uint64
 	marker := ssz.NewOffsetMarker(uint64(size), uint64(fixedSize))
@@ -94,21 +93,47 @@ func (i *Issue165) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Issue165 from an io.Reader
-func (i *Issue165) Decode(src io.Reader, limit int) (int, error) {
+func (i *Issue165) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := i.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = i.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
+	var o0, o1 uint64
+	marker := ssz.NewOffsetMarker(uint64(limit), uint64(fixedSize))
 
+	// Offset (0) 'A'
+	o0, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Offset (1) 'B'
+	o1, read, err = marker.DecodeOffset(src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (0) 'A'
+	read, i.A, err = ssz.DecodeDynamicBytes(i.A, src, int(o1-o0), 0)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'B'
+	read, i.B, err = ssz.DecodeDynamicBytes(i.B, src, int(uint64(limit)-o1), 0)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Issue165 object

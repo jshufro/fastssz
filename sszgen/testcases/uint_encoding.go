@@ -88,21 +88,61 @@ func (u *Uints) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the Uints from an io.Reader
-func (u *Uints) Decode(src io.Reader, limit int) (int, error) {
+func (u *Uints) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := u.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = u.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Uint8'
+	{
+		var val uint8
+		read, err = ssz.DecodeValue[uint8](&val, src)
+		n += read
+		if err != nil {
+			return
+		}
+		u.Uint8 = Uint8(val)
+	}
+
+	// Field (1) 'Uint16'
+	{
+		var val uint16
+		read, err = ssz.DecodeValue[uint16](&val, src)
+		n += read
+		if err != nil {
+			return
+		}
+		u.Uint16 = Uint16(val)
+	}
+
+	// Field (2) 'Uint32'
+	{
+		var val uint32
+		read, err = ssz.DecodeValue[uint32](&val, src)
+		n += read
+		if err != nil {
+			return
+		}
+		u.Uint32 = Uint32(val)
+	}
+
+	// Field (3) 'Uint64'
+	{
+		var val uint64
+		read, err = ssz.DecodeValue[uint64](&val, src)
+		n += read
+		if err != nil {
+			return
+		}
+		u.Uint64 = Uint64(val)
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the Uints object

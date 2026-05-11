@@ -60,21 +60,31 @@ func (t *TimeType) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the TimeType from an io.Reader
-func (t *TimeType) Decode(src io.Reader, limit int) (int, error) {
+func (t *TimeType) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := t.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = t.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Timestamp'
+	read, err = ssz.DecodeTime(&t.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Int'
+	read, err = ssz.DecodeValue[uint64](&t.Int, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the TimeType object
@@ -163,21 +173,31 @@ func (t *TimeRawType) Encode(dst io.Writer) (int, error) {
 }
 
 // DecodeSSZ unmarshals the TimeRawType from an io.Reader
-func (t *TimeRawType) Decode(src io.Reader, limit int) (int, error) {
+func (t *TimeRawType) Decode(src io.Reader, limit int) (n int, err error) {
 	fixedSize := t.fixedSize()
 	if limit < fixedSize {
 		return 0, ssz.ErrSize
 	}
-	buf, err := io.ReadAll(src)
-	if err != nil {
-		return 0, err
-	}
-	_, err = t.UnmarshalSSZTail(buf)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	var read int
 
+	// Field (0) 'Timestamp'
+	read, err = ssz.DecodeValue[uint64](&t.Timestamp, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	// Field (1) 'Int'
+	read, err = ssz.DecodeValue[uint64](&t.Int, src)
+	n += read
+	if err != nil {
+		return
+	}
+
+	if n != limit {
+		return n, ssz.ErrSize
+	}
+	return
 }
 
 // fixedSize returns the fixed size of the TimeRawType object
